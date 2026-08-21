@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS consent_artifacts (
                     CHECK (status IN ('active', 'expired', 'revoked'))
 );
 
-CREATE INDEX idx_consent_lookup
+CREATE INDEX IF NOT EXISTS idx_consent_lookup
     ON consent_artifacts(principal_id, purpose_id)
     WHERE status = 'active';
 
@@ -103,8 +103,8 @@ CREATE TABLE IF NOT EXISTS audit_edges (
     created_at    TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_lineage_source ON audit_edges(source_node);
-CREATE INDEX idx_lineage_target ON audit_edges(target_node);
+CREATE INDEX IF NOT EXISTS idx_lineage_source ON audit_edges(source_node);
+CREATE INDEX IF NOT EXISTS idx_lineage_target ON audit_edges(target_node);
 
 -- ── API Keys ──────────────────────────────────────────────
 
@@ -194,4 +194,4 @@ CREATE TABLE IF NOT EXISTS usage_records (
     recorded_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_usage_lookup ON usage_records(tenant_id, project_id, service, recorded_at);
+CREATE INDEX IF NOT EXISTS idx_usage_lookup ON usage_records(tenant_id, project_id, service, recorded_at);

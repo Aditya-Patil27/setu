@@ -25,6 +25,7 @@
     "eslint": "^9.0.0",
     "prettier": "^3.4.0",
     "rimraf": "^6.0.0",
+    "tsx": "^4.19.0",
     "typescript": "^5.7.0",
     "vitest": "^3.0.0"
   },

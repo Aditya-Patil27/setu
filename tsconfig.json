@@ -12,7 +12,6 @@
     { "path": "services/consent" },
     { "path": "services/audit" },
     { "path": "services/workflow" },
-    { "path": "services/metering" },
-    { "path": "apps/dashboard" }
+    { "path": "services/metering" }
   ]
 }

@@ -1,6 +1,6 @@
 /**
- * @setu/db — Database client, pool management, and migration utilities.
+ * @setu/db — Database client, pool management, and request-context helpers.
  */
 
-export { createPool, type PoolConfig } from './pool.js';
-export { withPurpose } from './purpose.js';
+export { createPool, createRolePool, type PoolConfig, type DbRole } from './pool.js';
+export { withContext, withTransaction, type DbContext } from './context.js';

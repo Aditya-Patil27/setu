@@ -11,3 +11,7 @@ coverage/
 .turbo/
 *.tsbuildinfo
 .next/
+
+# harness state
+.claude-flow/
+.swarm/

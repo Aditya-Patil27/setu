@@ -10,10 +10,13 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@setu/shared": "*",
+    "@fastify/cors": "^10.0.0",
+    "@node-rs/argon2": "^2.0.0",
     "@setu/db": "*",
+    "@setu/shared": "*",
     "fastify": "^5.0.0",
-    "@fastify/cors": "^10.0.0"
+    "jose": "^5.9.0",
+    "zod": "^3.24.0"
   },
   "devDependencies": {
     "tsx": "^4.0.0"
