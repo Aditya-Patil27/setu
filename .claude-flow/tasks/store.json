@@ -1,0 +1,354 @@
+{
+  "tasks": {
+    "task-1787314246359-npkbhq": {
+      "taskId": "task-1787314246359-npkbhq",
+      "type": "feature",
+      "description": "W0.1 Migration runner: scripts/migrate.mjs + packages/db/migrations/ dir, schema_migrations tracking table, vitest.config.ts at root, tsx dev dependency",
+      "priority": "critical",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-0",
+        "foundation",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:10:46.359Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314251935-ftvjz1": {
+      "taskId": "task-1787314251935-ftvjz1",
+      "type": "feature",
+      "description": "W0.2 Migration 002 schema: setu_runtime role (NOBYPASSRLS, DML-only grants), collection_definitions, field_definitions, field_purpose_grants, otp_challenges, refresh_tokens",
+      "priority": "critical",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-0",
+        "foundation",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:10:51.935Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314254063-hsigzi": {
+      "taskId": "task-1787314254063-hsigzi",
+      "type": "feature",
+      "description": "W0.3 SQL functions: setu_field_visible(principal_id, collection_id, field, purpose) two-gate check, setu_append_audit() hash-chained with advisory lock, setu_audit_denial() SECURITY DEFINER",
+      "priority": "critical",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-0",
+        "foundation",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:10:54.063Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314255446-h2i4j3": {
+      "taskId": "task-1787314255446-h2i4j3",
+      "type": "feature",
+      "description": "W0.4 withContext(pool, {projectId, purpose, principalId}, fn) in packages/db replacing withPurpose; SET LOCAL app.project_id/app.purpose/app.principal_id; runtime-role pool factory",
+      "priority": "critical",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-0",
+        "foundation",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:10:55.446Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314256860-fjuf0u": {
+      "taskId": "task-1787314256860-fjuf0u",
+      "type": "feature",
+      "description": "W0.5 Integration test harness: setu_test database, per-file tenant/project/schema provisioning and teardown, fixture helpers for purposes/principals/consent artifacts",
+      "priority": "critical",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-0",
+        "foundation",
+        "testing",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:10:56.860Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314258277-e1225a": {
+      "taskId": "task-1787314258277-e1225a",
+      "type": "feature",
+      "description": "W1.1 M3 Consent: purpose registry routes POST/GET /v1/purposes with zod validation",
+      "priority": "high",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-1",
+        "consent",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:10:58.277Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314260405-e6n3au": {
+      "taskId": "task-1787314260405-e6n3au",
+      "type": "feature",
+      "description": "W1.2 M3 Consent: artifact CRUD - POST /v1/consents, GET /v1/consents?principal_id=, POST /v1/consents/:id/revoke, advisory-only GET /v1/consents/check",
+      "priority": "high",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-1",
+        "consent",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:11:00.405Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314261791-z2wqtv": {
+      "taskId": "task-1787314261791-z2wqtv",
+      "type": "feature",
+      "description": "W1.3 M3 Consent: principal-facing GET /v1/me/consents and POST /v1/me/consents/:id/revoke under JWT; no-op NATS publisher interface emitting setu.consent.changed",
+      "priority": "high",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-1",
+        "consent",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:11:01.791Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314263914-855tg8": {
+      "taskId": "task-1787314263914-855tg8",
+      "type": "feature",
+      "description": "W2.1 M4 Data DDL generator: identifier validation ^[a-z][a-z0-9_]{0,62}$, reserved-word rejection, format(%I) rendering, fixed pg type allowlist, table + principal_id + indexes + unique constraints",
+      "priority": "critical",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-2",
+        "data",
+        "security",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:11:03.914Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314266059-dk8ge4": {
+      "taskId": "task-1787314266059-dk8ge4",
+      "type": "feature",
+      "description": "W2.2 M4 Data: RLS policy generation (ENABLE + FORCE, consent-subquery USING, WITH CHECK on write) and masking view generation with security_invoker=true, mask strategies null/redact/partial/hash",
+      "priority": "critical",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-2",
+        "data",
+        "enforcement",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:11:06.059Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314267441-67y4n5": {
+      "taskId": "task-1787314267441-67y4n5",
+      "type": "feature",
+      "description": "W2.3 M4 Data: collection routes POST/GET /v1/collections, PATCH /v1/collections/:name with view regeneration",
+      "priority": "high",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-2",
+        "data",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:11:07.441Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314268852-wnp7vs": {
+      "taskId": "task-1787314268852-wnp7vs",
+      "type": "feature",
+      "description": "W2.4 M4 Data: record CRUD reading through _masked view, filter/sort/keyset pagination, rejection of filters and sorts on masked columns to prevent oracle leak, key-present masked-value response shape",
+      "priority": "critical",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-2",
+        "data",
+        "security",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:11:08.852Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314270967-29nxjc": {
+      "taskId": "task-1787314270967-29nxjc",
+      "type": "feature",
+      "description": "W2.5 M4 Data: in-transaction audit writes via setu_append_audit, opaque 404/empty-list denials with full detail recorded via setu_audit_denial, 42501 mapped to ConsentDeniedError",
+      "priority": "high",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-2",
+        "data",
+        "audit",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:11:10.967Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314272381-eqw8qk": {
+      "taskId": "task-1787314272381-eqw8qk",
+      "type": "feature",
+      "description": "W3.1 M2 Auth: API key issuance/list/revoke with argon2 hashing, plaintext returned once, scopes",
+      "priority": "high",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-3",
+        "auth",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:11:12.381Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314273792-09o0mi": {
+      "taskId": "task-1787314273792-09o0mi",
+      "type": "feature",
+      "description": "W3.2 M2 Auth: OTP start/verify with mock provider, principal linking, JWT issuance via jose, refresh token rotation, GET /v1/auth/me",
+      "priority": "high",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-3",
+        "auth",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:11:13.792Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314275918-pxy554": {
+      "taskId": "task-1787314275918-pxy554",
+      "type": "feature",
+      "description": "W4.1 M1 Gateway: credential resolution (API key hash lookup, local JWT verify), tenant/project/principal resolution, mandatory purpose header validated against project registry",
+      "priority": "high",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-4",
+        "gateway",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:11:15.918Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314277324-0jg6kp": {
+      "taskId": "task-1787314277324-0jg6kp",
+      "type": "feature",
+      "description": "W4.2 M1 Gateway: HMAC context signing into x-setu-sig, downstream verification middleware, proxy to auth/consent/data, per-key token-bucket rate limit, unpublish internal ports in docker-compose",
+      "priority": "critical",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-4",
+        "gateway",
+        "security",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:11:17.324Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314279439-ec8jz0": {
+      "taskId": "task-1787314279439-ec8jz0",
+      "type": "feature",
+      "description": "W5.1 SQL-level enforcement tests: consented purpose returns row, non-consented returns zero rows, tenant-granted-but-principal-withheld field masked, mid-test revocation flips result",
+      "priority": "critical",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-5",
+        "testing",
+        "enforcement",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:11:19.439Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314280852-mn6cbl": {
+      "taskId": "task-1787314280852-mn6cbl",
+      "type": "feature",
+      "description": "W5.2 Negative tests: setu_runtime asserted NOBYPASSRLS, forged x-setu-purpose without valid HMAC rejected, DDL injection via collection name rejected, masked-column filter oracle rejected",
+      "priority": "critical",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-5",
+        "testing",
+        "security",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:11:20.852Z",
+      "startedAt": null,
+      "completedAt": null
+    },
+    "task-1787314282368-xl509k": {
+      "taskId": "task-1787314282368-xl509k",
+      "type": "feature",
+      "description": "W5.3 scripts/seed.mjs demo tenant: purposes (billing/analytics/support), principals, declared collection, consent artifacts in active/expired/revoked/partial-field states; plus full E2E spine tests and final typecheck+lint+test verification",
+      "priority": "high",
+      "status": "pending",
+      "progress": 0,
+      "assignedTo": [],
+      "tags": [
+        "wave-5",
+        "testing",
+        "demo",
+        "setu-spine"
+      ],
+      "createdAt": "2026-08-21T12:11:22.368Z",
+      "startedAt": null,
+      "completedAt": null
+    }
+  },
+  "version": "3.0.0"
+}
