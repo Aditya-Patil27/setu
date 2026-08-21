@@ -1,0 +1,18 @@
+{
+  "files": [],
+  "references": [
+    { "path": "packages/shared" },
+    { "path": "packages/db" },
+    { "path": "packages/sdk" },
+    { "path": "services/gateway" },
+    { "path": "services/auth" },
+    { "path": "services/data" },
+    { "path": "services/storage" },
+    { "path": "services/functions" },
+    { "path": "services/consent" },
+    { "path": "services/audit" },
+    { "path": "services/workflow" },
+    { "path": "services/metering" },
+    { "path": "apps/dashboard" }
+  ]
+}

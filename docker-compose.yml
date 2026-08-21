@@ -1,0 +1,178 @@
+version: "3.9"
+
+services:
+  # ── Infrastructure ───────────────────────────────────────
+  postgres:
+    image: pgvector/pgvector:pg16
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-setu}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-setu_dev_password}
+      POSTGRES_DB: ${POSTGRES_DB:-setu}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./packages/db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-setu}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-setu_minio}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-setu_minio_password}
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  nats:
+    image: nats:2-alpine
+    ports:
+      - "${NATS_PORT:-4222}:4222"
+      - "8222:8222"  # monitoring
+    command: ["--jetstream", "--http_port", "8222"]
+    healthcheck:
+      test: ["CMD", "nats-server", "--signal", "ldm"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  # ── Services ─────────────────────────────────────────────
+  gateway:
+    build:
+      context: .
+      dockerfile: deploy/docker/gateway.Dockerfile
+    ports:
+      - "${GATEWAY_PORT:-3000}:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    env_file: .env
+
+  auth:
+    build:
+      context: .
+      dockerfile: deploy/docker/auth.Dockerfile
+    ports:
+      - "${AUTH_SERVICE_PORT:-3001}:3001"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+
+  data:
+    build:
+      context: .
+      dockerfile: deploy/docker/data.Dockerfile
+    ports:
+      - "${DATA_SERVICE_PORT:-3002}:3002"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    env_file: .env
+
+  storage:
+    build:
+      context: .
+      dockerfile: deploy/docker/storage.Dockerfile
+    ports:
+      - "${STORAGE_SERVICE_PORT:-3003}:3003"
+    depends_on:
+      minio:
+        condition: service_healthy
+    env_file: .env
+
+  functions:
+    build:
+      context: .
+      dockerfile: deploy/docker/functions.Dockerfile
+    ports:
+      - "${FUNCTIONS_SERVICE_PORT:-3004}:3004"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock  # for spawning function containers
+    env_file: .env
+
+  consent:
+    build:
+      context: .
+      dockerfile: deploy/docker/consent.Dockerfile
+    ports:
+      - "${CONSENT_SERVICE_PORT:-3005}:3005"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    env_file: .env
+
+  audit:
+    build:
+      context: .
+      dockerfile: deploy/docker/audit.Dockerfile
+    ports:
+      - "${AUDIT_SERVICE_PORT:-3006}:3006"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    env_file: .env
+
+  workflow:
+    build:
+      context: .
+      dockerfile: deploy/docker/workflow.Dockerfile
+    ports:
+      - "${WORKFLOW_SERVICE_PORT:-3007}:3007"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    env_file: .env
+
+  metering:
+    build:
+      context: .
+      dockerfile: deploy/docker/metering.Dockerfile
+    ports:
+      - "${METERING_SERVICE_PORT:-3008}:3008"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_healthy
+    env_file: .env
+
+  # ── Dashboard ────────────────────────────────────────────
+  dashboard:
+    build:
+      context: .
+      dockerfile: deploy/docker/dashboard.Dockerfile
+    ports:
+      - "${DASHBOARD_PORT:-3100}:3000"
+    depends_on:
+      - gateway
+    env_file: .env
+
+volumes:
+  pgdata:
+  miniodata:

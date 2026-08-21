@@ -1,0 +1,100 @@
+# ── Global ───────────────────────────────────────────────
+replicaCount: 1
+
+image:
+  registry: ""  # Set to GCR/Artifact Registry URL
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+# ── Services ─────────────────────────────────────────────
+gateway:
+  port: 3000
+  replicas: 2
+  resources:
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+
+auth:
+  port: 3001
+  replicas: 1
+
+data:
+  port: 3002
+  replicas: 1
+
+storage:
+  port: 3003
+  replicas: 1
+
+functions:
+  port: 3004
+  replicas: 1
+
+consent:
+  port: 3005
+  replicas: 1
+
+audit:
+  port: 3006
+  replicas: 1
+
+workflow:
+  port: 3007
+  replicas: 1
+
+metering:
+  port: 3008
+  replicas: 1
+
+dashboard:
+  port: 3100
+  replicas: 1
+
+# ── Infrastructure ───────────────────────────────────────
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "change-in-production"
+    database: setu
+  primary:
+    persistence:
+      size: 10Gi
+
+minio:
+  enabled: true
+  auth:
+    rootUser: setu_minio
+    rootPassword: "change-in-production"
+  persistence:
+    size: 10Gi
+
+nats:
+  enabled: true
+
+# ── Ingress ──────────────────────────────────────────────
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+  hosts:
+    - host: api.setu.example.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: gateway
+  tls:
+    - secretName: setu-tls
+      hosts:
+        - api.setu.example.com
+
+# ── Autoscaling ─────────────────────────────────────────
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 5
+  targetCPUUtilizationPercentage: 70

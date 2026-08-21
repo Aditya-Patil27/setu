@@ -1,0 +1,33 @@
+﻿# ── Build stage ─────────────────────────────────────────
+FROM node:22-alpine AS builder
+WORKDIR /app
+
+COPY package.json package-lock.json* ./
+COPY packages/shared/package.json packages/shared/
+COPY packages/db/package.json packages/db/
+COPY services/functions/package.json services/functions/
+
+RUN npm ci --workspace=@setu/functions
+
+COPY packages/shared/ packages/shared/
+COPY packages/db/ packages/db/
+COPY services/functions/ services/functions/
+COPY tsconfig.base.json ./
+
+RUN npm run build --workspace=@setu/shared && \
+    npm run build --workspace=@setu/db && \
+    npm run build --workspace=@setu/functions
+
+# ── Runtime stage ──────────────────────────────────────
+FROM node:22-alpine
+WORKDIR /app
+ENV NODE_ENV=production
+
+COPY --from=builder /app/node_modules node_modules/
+COPY --from=builder /app/packages/shared/dist packages/shared/dist/
+COPY --from=builder /app/packages/db/dist packages/db/dist/
+COPY --from=builder /app/services/functions/dist services/functions/dist/
+COPY --from=builder /app/services/functions/package.json services/functions/
+
+EXPOSE 3004
+CMD ["node", "services/functions/dist/index.js"]
