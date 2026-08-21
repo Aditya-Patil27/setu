@@ -3,7 +3,7 @@
  */
 import { buildApp } from './app.js';
 
-const PORT = parseInt(process.env._SERVICE_PORT ?? '3005', 10);
+const PORT = parseInt(process.env.CONSENT_SERVICE_PORT ?? '3005', 10);
 
 async function main() {
   const app = await buildApp();

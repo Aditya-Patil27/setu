@@ -5,4 +5,6 @@
 export * from './types/index.js';
 export * from './constants.js';
 export * from './errors.js';
+export * from './context.js';
+export * from './validate.js';
 export * from './utils/index.js';

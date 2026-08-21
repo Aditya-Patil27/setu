@@ -32,6 +32,8 @@ export const SETU = {
     PRINCIPAL_ID: 'x-setu-principal-id',
     PURPOSE: 'x-setu-purpose',
     REQUEST_ID: 'x-setu-request-id',
+    /** HMAC over the canonical context string; makes the headers above trustworthy. */
+    SIGNATURE: 'x-setu-sig',
   },
 
   /** Default resource limits for function containers. */

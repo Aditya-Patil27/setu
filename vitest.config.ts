@@ -23,6 +23,8 @@ export default defineConfig({
     testTimeout: 30_000,
     hookTimeout: 60_000,
     globalSetup: ['tests/global-setup.ts'],
+    // Services log at info by default; a passing suite should be quiet.
+    env: { LOG_LEVEL: 'silent' },
     // Forks keep each file's pg pools genuinely isolated.
     pool: 'forks',
   },
