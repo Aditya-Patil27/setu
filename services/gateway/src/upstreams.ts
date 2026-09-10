@@ -1,4 +1,4 @@
-export type ServiceName = 'auth' | 'data' | 'consent';
+export type ServiceName = 'auth' | 'data' | 'consent' | 'audit';
 
 export type Upstreams = Record<ServiceName, string>;
 
@@ -10,6 +10,8 @@ export function upstreamsFromEnv(): Upstreams {
     consent:
       process.env.CONSENT_SERVICE_URL ??
       `http://localhost:${process.env.CONSENT_SERVICE_PORT ?? 3005}`,
+    audit:
+      process.env.AUDIT_SERVICE_URL ?? `http://localhost:${process.env.AUDIT_SERVICE_PORT ?? 3006}`,
   };
 }
 
@@ -36,6 +38,13 @@ const ROUTES: Route[] = [
   { match: /^\/v1\/collections(?:\/|$)/, service: 'data', requiresPurpose: false },
   { match: /^\/v1\/(?:purposes|consents|me)(?:\/|$)/, service: 'consent', requiresPurpose: false },
   { match: /^\/v1\/(?:auth|keys)(?:\/|$)/, service: 'auth', requiresPurpose: false },
+  /**
+   * Reading the trail is the tenant inspecting their own compliance record, not
+   * an access to a data subject's data, so it binds no purpose — auditing an
+   * access must not itself need consent, or the log becomes unreadable exactly
+   * when it matters.
+   */
+  { match: /^\/v1\/audit(?:\/|$)/, service: 'audit', requiresPurpose: false },
 ];
 
 export function matchRoute(pathname: string): Route | undefined {

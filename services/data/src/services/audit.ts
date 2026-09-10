@@ -1,11 +1,12 @@
 import type pg from "pg";
+import { withContext, type DbContext } from "@setu/db";
 
 /**
  * Audit writes for the Data service.
  *
- * Every helper takes an open client because audits are appended inside the
- * caller's own transaction: a record read and its audit entry commit together or
- * not at all, so the chain cannot claim an access whose response never shipped.
+ * `appendAudit` takes an open client because a permitted access and its audit
+ * entry commit together or not at all, so the chain cannot claim an access whose
+ * response never shipped. `recordDenial` is the deliberate exception — see it.
  */
 
 /**
@@ -78,24 +79,38 @@ export interface DenialRecord {
  * NOT learn, since "absent" vs "forbidden" is itself a leak.
  *
  * `recordId` is null for list denials; the function attributes the attempt to
- * the acting principal from app.principal_id when it cannot find a row owner.
- * Must run inside the caller's transaction.
+ * the acting principal from app.principal_id when it cannot find a row owner,
+ * which is why this runs through `withContext` rather than a bare connection.
+ *
+ * Unlike `appendAudit`, this deliberately runs in a transaction of its own.
+ *
+ * Every denial ends with the caller's transaction being rolled back — that is
+ * what a denial *is* — so an entry written inside it would be rolled back too,
+ * and the trail would record permitted access and nothing else. The independence
+ * is the whole point: a denial has no access to commit alongside.
+ *
+ * Safe against the advisory lock `setu_append_audit` takes per project, because
+ * every caller reaches here before appending any audit row of its own, so the
+ * outer transaction never holds the lock this one waits for.
  */
 export async function recordDenial(
-  client: pg.PoolClient,
+  pool: pg.Pool,
+  ctx: DbContext,
   rec: DenialRecord,
 ): Promise<void> {
   const uuidNil = "00000000-0000-0000-0000-000000000000";
-  await client.query(
-    `SELECT public.setu_audit_denial($1, $2, $3, $4::uuid, $5, $6, $7::text[])`,
-    [
-      rec.projectId,
-      rec.schemaName,
-      rec.tableName,
-      rec.recordId ?? uuidNil,
-      rec.purposeId,
-      rec.action,
-      rec.fields,
-    ],
-  );
+  await withContext(pool, ctx, async (client) => {
+    await client.query(
+      `SELECT public.setu_audit_denial($1, $2, $3, $4::uuid, $5, $6, $7::text[])`,
+      [
+        rec.projectId,
+        rec.schemaName,
+        rec.tableName,
+        rec.recordId ?? uuidNil,
+        rec.purposeId,
+        rec.action,
+        rec.fields,
+      ],
+    );
+  });
 }

@@ -414,7 +414,7 @@ export async function getRecord(
     if (!res.rowCount) {
       // Zero rows is "absent" or "forbidden" — the response must not say which,
       // but the audit chain records the truth behind the 404.
-      await recordDenial(client, {
+      await recordDenial(pool, ctx, {
         projectId: ctx.projectId,
         schemaName: collection.schemaName,
         tableName: collection.tableName,
@@ -579,7 +579,7 @@ export async function updateRecord(
       );
       if (!res.rowCount) {
         // Same opacity contract as the read path.
-        await recordDenial(client, {
+        await recordDenial(pool, ctx, {
           projectId: ctx.projectId,
           schemaName: collection.schemaName,
           tableName: collection.tableName,
@@ -597,7 +597,7 @@ export async function updateRecord(
       if (sqlState(err) === CONSENT_VIOLATION) {
         // The statement aborted the surrounding work; the savepoint lets the
         // denial still reach the audit chain inside this same transaction.
-        await recordDenial(client, {
+        await recordDenial(pool, ctx, {
           projectId: ctx.projectId,
           schemaName: collection.schemaName,
           tableName: collection.tableName,
@@ -646,7 +646,7 @@ export async function deleteRecord(
         [recordId],
       );
       if (!res.rowCount) {
-        await recordDenial(client, {
+        await recordDenial(pool, ctx, {
           projectId: ctx.projectId,
           schemaName: collection.schemaName,
           tableName: collection.tableName,
@@ -662,7 +662,7 @@ export async function deleteRecord(
     } catch (err) {
       await client.query("ROLLBACK TO SAVEPOINT record_write");
       if (sqlState(err) === CONSENT_VIOLATION) {
-        await recordDenial(client, {
+        await recordDenial(pool, ctx, {
           projectId: ctx.projectId,
           schemaName: collection.schemaName,
           tableName: collection.tableName,
