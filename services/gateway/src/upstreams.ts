@@ -1,4 +1,4 @@
-export type ServiceName = 'auth' | 'data' | 'consent' | 'audit' | 'storage';
+export type ServiceName = 'auth' | 'data' | 'consent' | 'audit' | 'storage' | 'metering';
 
 export type Upstreams = Record<ServiceName, string>;
 
@@ -15,6 +15,9 @@ export function upstreamsFromEnv(): Upstreams {
     storage:
       process.env.STORAGE_SERVICE_URL ??
       `http://localhost:${process.env.STORAGE_SERVICE_PORT ?? 3003}`,
+    metering:
+      process.env.METERING_SERVICE_URL ??
+      `http://localhost:${process.env.METERING_SERVICE_PORT ?? 3008}`,
   };
 }
 
@@ -47,6 +50,11 @@ const ROUTES: Route[] = [
   { match: /^\/v1\/storage(?:\/|$)/, service: 'storage', requiresPurpose: true },
   { match: /^\/v1\/(?:purposes|consents|me)(?:\/|$)/, service: 'consent', requiresPurpose: false },
   { match: /^\/v1\/(?:auth|keys)(?:\/|$)/, service: 'auth', requiresPurpose: false },
+  /**
+   * Usage is counts of what the platform did, not a fact about anyone, so it
+   * binds no purpose. The closed meter vocabulary is what keeps that true.
+   */
+  { match: /^\/v1\/metering(?:\/|$)/, service: 'metering', requiresPurpose: false },
   /**
    * Reading the trail is the tenant inspecting their own compliance record, not
    * an access to a data subject's data, so it binds no purpose — auditing an

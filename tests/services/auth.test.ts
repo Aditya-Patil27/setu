@@ -101,7 +101,13 @@ describe('api keys', () => {
       [created.json().id],
     );
     expect(stored.rows[0].key_hash).toMatch(/^\$argon2id\$/);
-    expect(stored.rows[0].key_hash).not.toContain(key.split('_')[2]);
+
+    // The secret is base64url and may itself contain '_', so it is everything
+    // past the second separator — not split('_')[2], which would be a fragment
+    // short enough to turn up in a base64 digest by chance.
+    const secret = key.split('_').slice(2).join('_');
+    expect(secret.length).toBeGreaterThanOrEqual(16);
+    expect(stored.rows[0].key_hash).not.toContain(secret);
   });
 
   it('refuses an expiry in the past', async () => {

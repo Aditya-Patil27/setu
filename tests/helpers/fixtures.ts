@@ -69,11 +69,13 @@ export async function provisionProject(hint = 'proj'): Promise<TestProject> {
 export async function dropProject(project: TestProject): Promise<void> {
   const owner = testPool('owner');
   await owner.query(`DROP SCHEMA IF EXISTS ${quoteIdent(project.schemaName)} CASCADE`);
-  // Audit rows deliberately do not cascade from projects: a chain that vanished
-  // along with its project would not be an audit chain. Test data still has to go,
-  // and the Data service writes these on every read, permitted or denied.
+  // Audit and usage rows deliberately do not cascade: a chain that vanished
+  // along with its project would not be an audit chain, and usage that vanished
+  // would take the billing record with it. Test data still has to go, and the
+  // Data service writes audit rows on every read, permitted or denied.
   await owner.query(`DELETE FROM audit_edges WHERE project_id = $1`, [project.projectId]);
   await owner.query(`DELETE FROM audit_records WHERE project_id = $1`, [project.projectId]);
+  await owner.query(`DELETE FROM usage_records WHERE tenant_id = $1`, [project.tenantId]);
   // Projects, principals, purposes and consent artifacts all cascade from tenants.
   await owner.query(`DELETE FROM tenants WHERE id = $1`, [project.tenantId]);
 }
