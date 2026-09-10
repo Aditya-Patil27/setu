@@ -59,12 +59,17 @@ services:
         condition: service_healthy
     env_file: .env
 
+  # ── Platform services ────────────────────────────────────
+  #
+  # None of these publish a port. The gateway is the only way in, and that is
+  # load-bearing rather than tidy: these services trust the x-setu-* context
+  # headers the gateway signs, so anyone able to reach one directly could name
+  # their own purpose and the database would evaluate consent for whatever was
+  # claimed. They remain reachable from each other over the compose network.
   auth:
     build:
       context: .
       dockerfile: deploy/docker/auth.Dockerfile
-    ports:
-      - "${AUTH_SERVICE_PORT:-3001}:3001"
     depends_on:
       postgres:
         condition: service_healthy
@@ -74,8 +79,6 @@ services:
     build:
       context: .
       dockerfile: deploy/docker/data.Dockerfile
-    ports:
-      - "${DATA_SERVICE_PORT:-3002}:3002"
     depends_on:
       postgres:
         condition: service_healthy
@@ -87,8 +90,6 @@ services:
     build:
       context: .
       dockerfile: deploy/docker/storage.Dockerfile
-    ports:
-      - "${STORAGE_SERVICE_PORT:-3003}:3003"
     depends_on:
       minio:
         condition: service_healthy
@@ -98,8 +99,6 @@ services:
     build:
       context: .
       dockerfile: deploy/docker/functions.Dockerfile
-    ports:
-      - "${FUNCTIONS_SERVICE_PORT:-3004}:3004"
     depends_on:
       postgres:
         condition: service_healthy
@@ -111,8 +110,6 @@ services:
     build:
       context: .
       dockerfile: deploy/docker/consent.Dockerfile
-    ports:
-      - "${CONSENT_SERVICE_PORT:-3005}:3005"
     depends_on:
       postgres:
         condition: service_healthy
@@ -124,8 +121,6 @@ services:
     build:
       context: .
       dockerfile: deploy/docker/audit.Dockerfile
-    ports:
-      - "${AUDIT_SERVICE_PORT:-3006}:3006"
     depends_on:
       postgres:
         condition: service_healthy
@@ -137,8 +132,6 @@ services:
     build:
       context: .
       dockerfile: deploy/docker/workflow.Dockerfile
-    ports:
-      - "${WORKFLOW_SERVICE_PORT:-3007}:3007"
     depends_on:
       postgres:
         condition: service_healthy
@@ -150,8 +143,6 @@ services:
     build:
       context: .
       dockerfile: deploy/docker/metering.Dockerfile
-    ports:
-      - "${METERING_SERVICE_PORT:-3008}:3008"
     depends_on:
       postgres:
         condition: service_healthy
