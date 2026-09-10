@@ -1,4 +1,4 @@
-export type ServiceName = 'auth' | 'data' | 'consent' | 'audit';
+export type ServiceName = 'auth' | 'data' | 'consent' | 'audit' | 'storage';
 
 export type Upstreams = Record<ServiceName, string>;
 
@@ -12,6 +12,9 @@ export function upstreamsFromEnv(): Upstreams {
       `http://localhost:${process.env.CONSENT_SERVICE_PORT ?? 3005}`,
     audit:
       process.env.AUDIT_SERVICE_URL ?? `http://localhost:${process.env.AUDIT_SERVICE_PORT ?? 3006}`,
+    storage:
+      process.env.STORAGE_SERVICE_URL ??
+      `http://localhost:${process.env.STORAGE_SERVICE_PORT ?? 3003}`,
   };
 }
 
@@ -36,6 +39,12 @@ export interface Route {
 const ROUTES: Route[] = [
   { match: /^\/v1\/collections\/[^/]+\/records(?:\/|$)/, service: 'data', requiresPurpose: true },
   { match: /^\/v1\/collections(?:\/|$)/, service: 'data', requiresPurpose: false },
+  /**
+   * Storage binds a purpose on every route, including the list: an object about
+   * a person is personal data in exactly the way a row is, and the policy that
+   * governs it evaluates the same current_setting('app.purpose').
+   */
+  { match: /^\/v1\/storage(?:\/|$)/, service: 'storage', requiresPurpose: true },
   { match: /^\/v1\/(?:purposes|consents|me)(?:\/|$)/, service: 'consent', requiresPurpose: false },
   { match: /^\/v1\/(?:auth|keys)(?:\/|$)/, service: 'auth', requiresPurpose: false },
   /**

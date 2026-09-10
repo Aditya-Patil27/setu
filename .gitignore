@@ -12,6 +12,9 @@ coverage/
 *.tsbuildinfo
 .next/
 
+# local object store (STORAGE_ROOT)
+.storage/
+
 # harness state
 .claude-flow/
 .swarm/
