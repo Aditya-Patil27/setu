@@ -1,5 +1,4 @@
 import type { FastifyPluginAsync } from 'fastify';
-import type pg from 'pg';
 import { z } from 'zod';
 import {
   ConflictError,
@@ -39,7 +38,11 @@ const Name = z
   .max(64)
   .regex(/^[a-z][a-z0-9_-]*$/, 'must be lower-kebab or snake case, starting with a letter');
 
-const PurposeName = z.string().min(1).max(64).regex(/^[a-z][a-z0-9_]*$/);
+const PurposeName = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z][a-z0-9_]*$/);
 
 const Step = z.object({
   name: Name,
@@ -264,7 +267,9 @@ const routes: FastifyPluginAsync = async (app) => {
 
     // Every step has succeeded: the execution is done, carrying the last output.
     if (index >= specs.length) {
-      const last = specs.length ? await stepAt(app.pools.control, executionId, specs.length - 1) : undefined;
+      const last = specs.length
+        ? await stepAt(app.pools.control, executionId, specs.length - 1)
+        : undefined;
       const settled = await settle(executionId, 'succeeded', last?.output ?? null, null);
       return { executionId, status: settled, advanced: false, reason: 'complete' };
     }
@@ -306,7 +311,10 @@ const routes: FastifyPluginAsync = async (app) => {
 
     // Outside any transaction, deliberately: tenant code must not hold a
     // connection for the length of its own timeout.
-    const input = index === 0 ? execution.input : (await stepAt(app.pools.control, executionId, index - 1))?.output ?? null;
+    const input =
+      index === 0
+        ? execution.input
+        : ((await stepAt(app.pools.control, executionId, index - 1))?.output ?? null);
 
     const result = await app.invoker.invoke(spec.function, input, {
       requestId: ctx.requestId,
@@ -325,7 +333,9 @@ const routes: FastifyPluginAsync = async (app) => {
         await completion.query('COMMIT');
 
         const done = index === specs.length - 1;
-        const status = done ? await settle(executionId, 'succeeded', result.output, null) : 'running';
+        const status = done
+          ? await settle(executionId, 'succeeded', result.output, null)
+          : 'running';
         return {
           executionId,
           status,

@@ -7,7 +7,7 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/db/package.json packages/db/
 COPY services/metering/package.json services/metering/
 
-RUN npm ci --workspace=@setu/metering
+RUN npm ci --include-workspace-root --workspace=@setu/metering
 
 COPY packages/shared/ packages/shared/
 COPY packages/db/ packages/db/

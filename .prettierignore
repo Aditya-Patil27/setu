@@ -1,0 +1,17 @@
+node_modules/
+dist/
+coverage/
+*.tsbuildinfo
+package-lock.json
+
+# Harness and runtime state
+.claude-flow/
+.swarm/
+.storage/
+
+# Prose and deployment manifests are formatted by hand. Prettier rewrites
+# Markdown emphasis and table padding, and flips YAML quote style, which is
+# churn in files where the existing layout is deliberate.
+*.md
+*.yml
+*.yaml

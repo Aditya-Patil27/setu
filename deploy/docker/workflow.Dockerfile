@@ -7,7 +7,7 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/db/package.json packages/db/
 COPY services/workflow/package.json services/workflow/
 
-RUN npm ci --workspace=@setu/workflow
+RUN npm ci --include-workspace-root --workspace=@setu/workflow
 
 COPY packages/shared/ packages/shared/
 COPY packages/db/ packages/db/

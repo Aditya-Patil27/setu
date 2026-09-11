@@ -7,7 +7,7 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/db/package.json packages/db/
 COPY services/storage/package.json services/storage/
 
-RUN npm ci --workspace=@setu/storage
+RUN npm ci --include-workspace-root --workspace=@setu/storage
 
 COPY packages/shared/ packages/shared/
 COPY packages/db/ packages/db/

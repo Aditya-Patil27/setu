@@ -7,7 +7,7 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/db/package.json packages/db/
 COPY services/consent/package.json services/consent/
 
-RUN npm ci --workspace=@setu/consent
+RUN npm ci --include-workspace-root --workspace=@setu/consent
 
 COPY packages/shared/ packages/shared/
 COPY packages/db/ packages/db/

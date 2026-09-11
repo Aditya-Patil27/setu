@@ -7,7 +7,7 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/db/package.json packages/db/
 COPY services/auth/package.json services/auth/
 
-RUN npm ci --workspace=@setu/auth
+RUN npm ci --include-workspace-root --workspace=@setu/auth
 
 COPY packages/shared/ packages/shared/
 COPY packages/db/ packages/db/

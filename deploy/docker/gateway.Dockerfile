@@ -7,7 +7,7 @@ COPY packages/shared/package.json packages/shared/
 COPY packages/db/package.json packages/db/
 COPY services/gateway/package.json services/gateway/
 
-RUN npm ci --workspace=@setu/gateway
+RUN npm ci --include-workspace-root --workspace=@setu/gateway
 
 COPY packages/shared/ packages/shared/
 COPY packages/db/ packages/db/
