@@ -1,5 +1,5 @@
 export type ServiceName =
-  'auth' | 'data' | 'consent' | 'audit' | 'storage' | 'metering' | 'functions' | 'workflow';
+  'auth' | 'data' | 'consent' | 'audit' | 'storage' | 'metering' | 'functions' | 'workflow' | 'ai';
 
 export type Upstreams = Record<ServiceName, string>;
 
@@ -27,6 +27,7 @@ export function upstreamsFromEnv(): Upstreams {
     workflow:
       process.env.WORKFLOW_SERVICE_URL ??
       `http://localhost:${process.env.WORKFLOW_SERVICE_PORT ?? 3007}`,
+    ai: process.env.AI_SERVICE_URL ?? `http://localhost:${process.env.AI_SERVICE_PORT ?? 3009}`,
   };
 }
 
@@ -82,6 +83,14 @@ const ROUTES: Route[] = [
    * when it matters.
    */
   { match: /^\/v1\/audit(?:\/|$)/, service: 'audit', requiresPurpose: false },
+  /**
+   * Inference always binds a purpose, with no exception for any route under it.
+   * Unlike functions and workflows there is no case where reading tenant data
+   * into a model is purpose-free: an embedding is derived from a person's
+   * record, and a derivation with no declared intent is the thing the platform
+   * exists to refuse.
+   */
+  { match: /^\/v1\/ai(?:\/|$)/, service: 'ai', requiresPurpose: true },
 ];
 
 export function matchRoute(pathname: string): Route | undefined {

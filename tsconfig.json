@@ -13,6 +13,7 @@
     { "path": "services/consent" },
     { "path": "services/audit" },
     { "path": "services/workflow" },
-    { "path": "services/metering" }
+    { "path": "services/metering" },
+    { "path": "services/ai" }
   ]
 }

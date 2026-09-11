@@ -90,6 +90,7 @@ jobs:
           - audit
           - workflow
           - metering
+          - ai
           # dashboard is intentionally absent: apps/dashboard does not
           # exist yet (M8), and listing it here fails every build on main.
 

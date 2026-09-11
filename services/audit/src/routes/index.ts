@@ -26,7 +26,10 @@ const ListQuery = z.object({
     .regex(/^[a-z][a-z0-9_]*$/)
     .max(64)
     .optional(),
-  action: z.enum(['read', 'create', 'update', 'delete']).optional(),
+  // 'infer' is what the AI service records when a row reaches a model prompt.
+  // It is deliberately distinct from 'read': the question an auditor asks about
+  // inference is "when did a model see this", which 'read' cannot answer.
+  action: z.enum(['read', 'list', 'create', 'update', 'delete', 'infer']).optional(),
   outcome: z.enum(['permitted', 'denied']).optional(),
   since: z.coerce.date().optional(),
   until: z.coerce.date().optional(),

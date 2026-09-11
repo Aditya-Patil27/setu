@@ -142,6 +142,15 @@ services:
         condition: service_healthy
     env_file: .env
 
+  ai:
+    build:
+      context: .
+      dockerfile: deploy/docker/ai.Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    env_file: .env
+
   metering:
     build:
       context: .
