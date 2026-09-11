@@ -4,6 +4,7 @@
     { "path": "packages/shared" },
     { "path": "packages/db" },
     { "path": "packages/sdk" },
+    { "path": "packages/mcp" },
     { "path": "services/gateway" },
     { "path": "services/auth" },
     { "path": "services/data" },
