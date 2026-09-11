@@ -1,24 +1,84 @@
-﻿import Fastify from 'fastify';
+import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
+import { SetuError, ValidationError } from '@setu/shared';
+import { closePools, createPools, type Pools } from './db.js';
+import { DEFAULT_LEASE_SECONDS } from './engine.js';
+import { createHttpInvoker, functionsUrlFromEnv, type StepInvoker } from './invoker.js';
+import routes from './routes/index.js';
+
+declare module 'fastify' {
+  interface FastifyInstance {
+    pools: Pools;
+    /** How a step reaches its function. Replaceable for tests. */
+    invoker: StepInvoker;
+    /** How long a claimed step may be held before another worker may reclaim it. */
+    leaseSeconds: number;
+    /** HMAC key the gateway signs request context with. */
+    signingSecret: string;
+  }
+}
+
+export interface AppOptions {
+  pools?: Pools;
+  invoker?: StepInvoker;
+  leaseSeconds?: number;
+  signingSecret?: string;
+}
 
 /**
  * Build the workflow service Fastify application.
  * Separated from index.ts for testability.
  */
-export async function buildApp() {
+export async function buildApp(opts: AppOptions = {}): Promise<FastifyInstance> {
   const app = Fastify({
-    logger: {
-      level: process.env.LOG_LEVEL ?? 'info',
-    },
+    logger: { level: process.env.LOG_LEVEL ?? 'info' },
   });
 
   await app.register(cors);
 
-  // Health check
+  const ownsPools = opts.pools === undefined;
+  app.decorate('pools', opts.pools ?? createPools());
+  app.decorate(
+    'invoker',
+    opts.invoker ??
+      createHttpInvoker(
+        functionsUrlFromEnv(),
+        opts.signingSecret ?? process.env.INTERNAL_SIGNING_SECRET ?? '',
+      ),
+  );
+  app.decorate('leaseSeconds', opts.leaseSeconds ?? DEFAULT_LEASE_SECONDS);
+  app.decorate('signingSecret', opts.signingSecret ?? process.env.INTERNAL_SIGNING_SECRET ?? '');
+
+  if (!app.signingSecret) {
+    throw new Error('INTERNAL_SIGNING_SECRET is required — refusing to trust unsigned context');
+  }
+
+  if (ownsPools) {
+    app.addHook('onClose', async (instance) => {
+      await closePools(instance.pools);
+    });
+  }
+
+  app.setErrorHandler((err, request, reply) => {
+    if (err instanceof ValidationError) {
+      return reply.status(err.statusCode).send({
+        error: { code: err.code, message: err.message, details: err.details },
+      });
+    }
+    if (err instanceof SetuError) {
+      return reply.status(err.statusCode).send(err.toJSON());
+    }
+
+    // Never surface an unrecognised error: it may carry SQL text or connection details.
+    request.log.error({ err }, 'unhandled error');
+    return reply.status(500).send({
+      error: { code: 'INTERNAL_ERROR', message: 'Internal server error', requestId: request.id },
+    });
+  });
+
   app.get('/health', async () => ({ status: 'ok', service: 'workflow' }));
 
-  // TODO: Register workflow routes
-  // await app.register(import('./routes/index.js'), { prefix: '/' });
+  await app.register(routes, { prefix: '/v1' });
 
   return app;
 }

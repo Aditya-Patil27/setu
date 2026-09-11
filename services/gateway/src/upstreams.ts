@@ -1,4 +1,4 @@
-export type ServiceName = 'auth' | 'data' | 'consent' | 'audit' | 'storage' | 'metering' | 'functions';
+export type ServiceName = 'auth' | 'data' | 'consent' | 'audit' | 'storage' | 'metering' | 'functions' | 'workflow';
 
 export type Upstreams = Record<ServiceName, string>;
 
@@ -21,6 +21,9 @@ export function upstreamsFromEnv(): Upstreams {
     functions:
       process.env.FUNCTIONS_SERVICE_URL ??
       `http://localhost:${process.env.FUNCTIONS_SERVICE_PORT ?? 3004}`,
+    workflow:
+      process.env.WORKFLOW_SERVICE_URL ??
+      `http://localhost:${process.env.WORKFLOW_SERVICE_PORT ?? 3007}`,
   };
 }
 
@@ -64,6 +67,11 @@ const ROUTES: Route[] = [
    * knows — so it decides, and refuses a mismatch in either direction.
    */
   { match: /^\/v1\/functions(?:\/|$)/, service: 'functions', requiresPurpose: false },
+  /**
+   * As with functions, whether a purpose is required depends on what the
+   * workflow declared, so the service decides rather than the gateway.
+   */
+  { match: /^\/v1\/workflows(?:\/|$)/, service: 'workflow', requiresPurpose: false },
   /**
    * Reading the trail is the tenant inspecting their own compliance record, not
    * an access to a data subject's data, so it binds no purpose — auditing an
