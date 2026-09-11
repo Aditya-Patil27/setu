@@ -1,19 +1,11 @@
 /**
- * @setu/sdk — TypeScript client SDK for the Setu platform.
+ * @setu/sdk — TypeScript client for the Setu gateway.
  *
- * Usage:
- *   import { SetuClient } from '@setu/sdk';
- *
- *   const setu = new SetuClient({
- *     url: 'https://api.setu.example.com',
- *     apiKey: 'sk_...',
- *   });
- *
- *   const patients = await setu
- *     .from('patients')
- *     .select('name, phone, diagnosis')
- *     .forPurpose('appointment_reminder');
+ * The client is a client: it holds an API key and talks HTTP to the gateway,
+ * exactly as curl would. It has no database access and no signing secret, so
+ * nothing it can do bypasses the enforcement the gateway and Postgres apply.
  */
 
 export { SetuClient } from './client.js';
-export type { SetuClientConfig } from './client.js';
+export { SetuHttp, SetuApiError, type SetuClientConfig, type RequestOptions } from './http.js';
+export * from './types.js';

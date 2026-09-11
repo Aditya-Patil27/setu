@@ -1,94 +1,181 @@
-import { SETU } from '@setu/shared';
-
-export interface SetuClientConfig {
-  /** Base URL of the Setu API gateway. */
-  url: string;
-  /** Project API key. */
-  apiKey: string;
-}
+import { SetuHttp, type SetuClientConfig } from './http.js';
+import type {
+  AuditRecord,
+  ChainVerification,
+  Collection,
+  ConsentArtifact,
+  ConsentCheck,
+  FieldInput,
+  ListRecordsQuery,
+  Purpose,
+  RecordListPage,
+  TenantRecord,
+} from './types.js';
 
 /**
- * Setu TypeScript client SDK.
+ * Typed client for the Setu gateway.
  *
- * Provides a fluent, purpose-aware interface for interacting with the
- * Setu platform — authentication, data queries, file storage, and functions.
+ * Every method maps to one public route. Where the gateway requires a bound
+ * purpose the signature demands one, so a caller cannot omit it and discover
+ * the requirement from a 400 at runtime.
  */
 export class SetuClient {
-  private readonly baseUrl: string;
-  private readonly apiKey: string;
+  private readonly http: SetuHttp;
 
   constructor(config: SetuClientConfig) {
-    this.baseUrl = config.url.replace(/\/+$/, '');
-    this.apiKey = config.apiKey;
+    this.http = new SetuHttp(config);
   }
 
-  /**
-   * Start building a query against a tenant table.
-   */
-  from(table: string): QueryBuilder {
-    return new QueryBuilder(this.baseUrl, this.apiKey, table);
+  // ── Collections (control plane: no purpose) ───────────────
+
+  async listCollections(): Promise<{ collections: Collection[] }> {
+    return this.http.request('/v1/collections');
   }
 
-  // TODO: auth, storage, functions, workflows
-}
-
-/**
- * Fluent query builder with `.forPurpose()` as the terminal method.
- */
-class QueryBuilder {
-  private readonly baseUrl: string;
-  private readonly apiKey: string;
-  private readonly table: string;
-  private columns: string = '*';
-  private purpose?: string;
-  private filters: Array<{ column: string; op: string; value: unknown }> = [];
-
-  constructor(baseUrl: string, apiKey: string, table: string) {
-    this.baseUrl = baseUrl;
-    this.apiKey = apiKey;
-    this.table = table;
+  async getCollection(name: string): Promise<Collection> {
+    return this.http.request(`/v1/collections/${encodeURIComponent(name)}`);
   }
 
-  select(columns: string): this {
-    this.columns = columns;
-    return this;
-  }
-
-  where(column: string, op: string, value: unknown): this {
-    this.filters.push({ column, op, value });
-    return this;
-  }
-
-  /**
-   * Declare the purpose for this data access.
-   * This is evaluated against the consent engine before any data is returned.
-   */
-  async forPurpose(purpose: string): Promise<unknown[]> {
-    this.purpose = purpose;
-    return this.execute();
-  }
-
-  private async execute(): Promise<unknown[]> {
-    const url = `${this.baseUrl}/data/${this.table}`;
-    const response = await fetch(url, {
+  async createCollection(name: string, fields: FieldInput[]): Promise<Collection> {
+    return this.http.request('/v1/collections', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${this.apiKey}`,
-        [SETU.HEADERS.PURPOSE]: this.purpose ?? '',
-      },
-      body: JSON.stringify({
-        select: this.columns,
-        filters: this.filters,
-      }),
+      body: { name, fields },
     });
+  }
 
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      throw new Error(`Setu API error ${response.status}: ${JSON.stringify(body)}`);
-    }
+  async addFields(name: string, fields: FieldInput[]): Promise<Collection> {
+    return this.http.request(`/v1/collections/${encodeURIComponent(name)}`, {
+      method: 'PATCH',
+      body: { fields },
+    });
+  }
 
-    const body = (await response.json()) as { data: unknown[] };
-    return body.data;
+  // ── Records (data plane: purpose required) ────────────────
+
+  /**
+   * Tenant field values sit flat alongside principalId, matching the service's
+   * own contract — `principal_id` is platform-owned and rejected.
+   */
+  async createRecord(
+    collection: string,
+    purpose: string,
+    principalId: string,
+    fields: Record<string, unknown>,
+  ): Promise<TenantRecord> {
+    return this.http.request(`/v1/collections/${encodeURIComponent(collection)}/records`, {
+      method: 'POST',
+      purpose,
+      body: { principalId, ...fields },
+    });
+  }
+
+  /**
+   * Filters are flat query parameters: `{ city: 'Pune' }` or
+   * `{ 'created_at.gte': '2026-01-01' }`. A filter on a column this purpose
+   * cannot read is refused rather than silently ignored — that refusal is what
+   * stops a masked column being walked out through comparisons.
+   */
+  async listRecords(
+    collection: string,
+    purpose: string,
+    query: ListRecordsQuery = {},
+  ): Promise<RecordListPage> {
+    return this.http.request(`/v1/collections/${encodeURIComponent(collection)}/records`, {
+      purpose,
+      query: query as Record<string, string | number | undefined>,
+    });
+  }
+
+  async getRecord(collection: string, purpose: string, id: string): Promise<TenantRecord> {
+    return this.http.request(
+      `/v1/collections/${encodeURIComponent(collection)}/records/${encodeURIComponent(id)}`,
+      { purpose },
+    );
+  }
+
+  async updateRecord(
+    collection: string,
+    purpose: string,
+    id: string,
+    fields: Record<string, unknown>,
+  ): Promise<TenantRecord> {
+    return this.http.request(
+      `/v1/collections/${encodeURIComponent(collection)}/records/${encodeURIComponent(id)}`,
+      { method: 'PATCH', purpose, body: fields },
+    );
+  }
+
+  async deleteRecord(collection: string, purpose: string, id: string): Promise<void> {
+    await this.http.request(
+      `/v1/collections/${encodeURIComponent(collection)}/records/${encodeURIComponent(id)}`,
+      { method: 'DELETE', purpose },
+    );
+  }
+
+  // ── Purposes ──────────────────────────────────────────────
+
+  async listPurposes(): Promise<{ purposes: Purpose[] }> {
+    return this.http.request('/v1/purposes');
+  }
+
+  async createPurpose(name: string, description = '', legalBasis = 'consent'): Promise<Purpose> {
+    return this.http.request('/v1/purposes', {
+      method: 'POST',
+      body: { name, description, legalBasis },
+    });
+  }
+
+  // ── Consent ───────────────────────────────────────────────
+
+  async listConsents(principalId?: string): Promise<{ consents: ConsentArtifact[] }> {
+    return this.http.request('/v1/consents', { query: { principalId } });
+  }
+
+  /** A new grant supersedes any active artifact for the same principal+purpose. */
+  async grantConsent(
+    principalId: string,
+    purpose: string,
+    fields: string[],
+    expiresAt?: string,
+  ): Promise<ConsentArtifact> {
+    return this.http.request('/v1/consents', {
+      method: 'POST',
+      body: { principalId, purpose, fields, expiresAt },
+    });
+  }
+
+  async revokeConsent(id: string): Promise<{ id: string; status: string }> {
+    return this.http.request(`/v1/consents/${encodeURIComponent(id)}/revoke`, {
+      method: 'POST',
+    });
+  }
+
+  async checkConsent(principalId: string, purpose: string): Promise<ConsentCheck> {
+    return this.http.request('/v1/consents/check', {
+      query: { principalId, purpose },
+    });
+  }
+
+  // ── Audit ─────────────────────────────────────────────────
+
+  async listAuditRecords(
+    query: {
+      principalId?: string;
+      purpose?: string;
+      action?: 'read' | 'create' | 'update' | 'delete';
+      outcome?: 'permitted' | 'denied';
+      since?: string;
+      until?: string;
+      after?: number;
+      limit?: number;
+    } = {},
+  ): Promise<{ records: AuditRecord[]; nextAfter?: number }> {
+    return this.http.request('/v1/audit/records', {
+      query: query as Record<string, string | number | undefined>,
+    });
+  }
+
+  async verifyChain(): Promise<ChainVerification> {
+    return this.http.request('/v1/audit/verify');
   }
 }
