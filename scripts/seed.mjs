@@ -14,7 +14,7 @@
 import { randomBytes } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import pg from 'pg';
 import { hash as argonHash } from '@node-rs/argon2';
 
@@ -53,30 +53,123 @@ const SLUG = 'demo';
 const SCHEMA = 's_demo';
 const GATEWAY = `http://localhost:${process.env.GATEWAY_PORT ?? 3000}`;
 
-/** The purposes the demo reads under. Field grants are declared with the collection. */
-const PURPOSES = [
+/**
+ * Three purposes, chosen so that none is a superset of another.
+ *
+ * That is the whole point. A delivery partner sees where the order is going but
+ * not what it cost; analytics sees what it cost but has no idea whose order it
+ * was. Neither is "more privileged" — so this cannot be expressed as a role
+ * without inventing one role per combination, which is exactly the difference
+ * between gating on who is asking and gating on why.
+ */
+export const PURPOSES = [
+  ['delivery_partner', 'Delivering this order to the data subject', 'contract'],
   ['support_chat', 'Answering a support request from the data subject', 'consent'],
-  ['analytics', 'Aggregate product analytics', 'consent'],
+  ['analytics', 'Aggregate product analytics', 'legitimate_use'],
 ];
 
 /**
- * Two principals whose consent differs, because one principal proves nothing.
- * Biju withholds his name from support, so the same purpose sees the two rows
- * differently — which is the behaviour worth demonstrating.
+ * Three customers whose consent differs, because one principal proves nothing.
+ *
+ * Each demonstrates a different gate:
+ *
+ *   Asha  — consents to everything. The baseline the others are read against.
+ *   Biju  — never consented to analytics, so the RLS policy hides his row from
+ *           that purpose entirely. Row visibility, not field masking.
+ *   Priya — consents to analytics but withholds her phone from support, even
+ *           though the tenant grants that field to support. Proves the two gates
+ *           are independent: the tenant's grant alone is not enough.
  */
-const PRINCIPALS = [
+export const PRINCIPALS = [
   {
     displayName: 'Asha Menon',
     phone: '+919812345678',
     consents: {
-      support_chat: ['full_name', 'phone', 'city'],
-      analytics: ['full_name', 'phone', 'city'],
+      delivery_partner: ['customer_name', 'phone', 'address', 'city'],
+      support_chat: ['customer_name', 'phone', 'city', 'item', 'amount'],
+      analytics: ['city', 'item', 'amount'],
     },
   },
   {
     displayName: 'Biju Thomas',
     phone: '+919812340000',
-    consents: { support_chat: ['phone', 'city'] },
+    consents: {
+      delivery_partner: ['customer_name', 'phone', 'address', 'city'],
+      support_chat: ['customer_name', 'phone', 'city', 'item', 'amount'],
+    },
+  },
+  {
+    displayName: 'Priya Nair',
+    phone: '+919812341111',
+    consents: {
+      delivery_partner: ['customer_name', 'phone', 'address', 'city'],
+      // No 'phone'. The tenant grants it to support_chat; she does not.
+      support_chat: ['customer_name', 'city', 'item', 'amount'],
+      analytics: ['city', 'item', 'amount'],
+    },
+  },
+];
+
+/**
+ * The collection the demo declares. Printed, not created: the DDL generator in
+ * the Data service is the only thing permitted to emit collection DDL, and
+ * duplicating it here would give the metadata a second, divergent source.
+ *
+ * `partial` on phone is what a delivery app actually shows you — '****1234'.
+ * The difference is that theirs is application code a bug can step around, and
+ * this is a generated view the database evaluates.
+ *
+ * amount is numeric, and a non-text column can only mask to null; the DDL
+ * generator rejects the other strategies at declaration time rather than
+ * producing a view that fails at read time.
+ */
+export const COLLECTION_FIELDS = [
+  {
+    name: 'customer_name',
+    type: 'text',
+    sensitivity: 'personal',
+    mask: 'redact',
+    purposes: ['delivery_partner', 'support_chat'],
+  },
+  {
+    name: 'phone',
+    type: 'text',
+    sensitivity: 'personal',
+    mask: 'partial',
+    // Support only. A delivery partner gets '****5678', which is what a real
+    // delivery app shows — and note the mask is a property of the field, not of
+    // the purpose, so every purpose that may not read it sees the same last
+    // four digits. If that is too much disclosure the field wants 'redact' or
+    // 'hash'; the tenant decides, and the database enforces whatever they chose.
+    purposes: ['support_chat'],
+  },
+  {
+    name: 'address',
+    type: 'text',
+    sensitivity: 'sensitive',
+    mask: 'redact',
+    purposes: ['delivery_partner'],
+  },
+  {
+    name: 'city',
+    type: 'text',
+    sensitivity: 'public',
+    mask: 'null',
+    purposes: ['delivery_partner', 'support_chat', 'analytics'],
+  },
+  {
+    name: 'item',
+    type: 'text',
+    sensitivity: 'public',
+    mask: 'null',
+    purposes: ['support_chat', 'analytics'],
+  },
+  {
+    name: 'amount',
+    type: 'numeric',
+    sensitivity: 'public',
+    mask: 'null',
+    purposes: ['support_chat', 'analytics'],
   },
 ];
 
@@ -104,11 +197,11 @@ async function main() {
     await client.query(`GRANT USAGE ON SCHEMA "${SCHEMA}" TO setu_runtime, setu_control`);
 
     const purposeIds = await seedPurposes(client, project);
-    await seedPrincipals(client, project, purposeIds);
+    const principalIds = await seedPrincipals(client, project, purposeIds);
     const key = await issueKey(client, project);
 
     await client.query('COMMIT');
-    report(project, key);
+    report(project, key, principalIds);
   } catch (err) {
     await client.query('ROLLBACK');
     throw err;
@@ -154,6 +247,8 @@ async function seedPurposes(client, projectId) {
 }
 
 async function seedPrincipals(client, projectId, purposeIds) {
+  const ids = {};
+
   for (const spec of PRINCIPALS) {
     const existing = await client.query(
       `SELECT id FROM principals WHERE project_id = $1 AND phone = $2`,
@@ -185,7 +280,11 @@ async function seedPrincipals(client, projectId, purposeIds) {
         [principalId, purposeIds[purpose], fields],
       );
     }
+
+    ids[spec.displayName] = principalId;
   }
+
+  return ids;
 }
 
 async function issueKey(client, projectId) {
@@ -203,36 +302,113 @@ async function issueKey(client, projectId) {
   return key;
 }
 
-function report(projectId, key) {
+function report(projectId, key, principalIds) {
   const lines = [
     '',
     `[seed] project ${projectId} (slug: ${SLUG}, schema: ${SCHEMA})`,
     `[seed] purposes: ${PURPOSES.map(([n]) => n).join(', ')}`,
-    `[seed] principals: ${PRINCIPALS.map((p) => p.displayName).join(', ')}`,
+    ...PRINCIPALS.map((p) => `[seed] ${p.displayName.padEnd(12)} ${principalIds[p.displayName]}`),
     '',
     '[seed] API key — shown once, not recoverable:',
     '',
     `    ${key.plaintext}`,
     '',
-    '[seed] Declare a collection, then read one row under two purposes:',
-    '',
     `    export SETU_KEY=${key.plaintext}`,
+    `    export SETU=${GATEWAY}`,
     '',
-    `    curl -sS ${GATEWAY}/v1/collections \\`,
+    '[seed] 1. Declare the collection. The `purposes` on each field are the',
+    '[seed]    tenant half of the gate; the consent seeded above is the other.',
+    '',
+    '    curl -sS $SETU/v1/collections \\',
     '      -H "authorization: Bearer $SETU_KEY" -H "content-type: application/json" \\',
-    `      -d '{"name":"patients","fields":[`,
-    `        {"name":"full_name","type":"text","mask":"redact","purposes":["support_chat"]},`,
-    `        {"name":"phone","type":"text","mask":"partial","purposes":["support_chat"]},`,
-    `        {"name":"city","type":"text","mask":"null","purposes":["support_chat","analytics"]}]}'`,
+    `      -d '{"name":"orders","fields":[`,
+    ...COLLECTION_FIELDS.map(
+      (f, i) => `        ${JSON.stringify(f)}${i < COLLECTION_FIELDS.length - 1 ? ',' : ''}`,
+    ),
+    `      ]}'`,
     '',
-    '    # then POST a record with x-setu-purpose: support_chat, and GET it back',
-    '    # under each purpose — full_name is readable for one and "***" for the other.',
+    '[seed] 2. Create an order. Any purpose that may write will do.',
+    '',
+    '    curl -sS $SETU/v1/collections/orders/records \\',
+    '      -H "authorization: Bearer $SETU_KEY" -H "content-type: application/json" \\',
+    '      -H "x-setu-purpose: support_chat" \\',
+    `      -d '${JSON.stringify({
+      principalId: principalIds['Asha Menon'],
+      customer_name: 'Asha Menon',
+      phone: '+919812345678',
+      address: '12 MG Road, Pune',
+      city: 'Pune',
+      item: 'Masala Dosa',
+      amount: '240.00',
+    })}'`,
+    '',
+    '[seed] 3. Read the same order back under each purpose, changing only the',
+    '[seed]    x-setu-purpose header. Nothing else about the request differs.',
+    '',
+    '    for p in delivery_partner support_chat analytics; do',
+    '      echo "--- $p"',
+    '      curl -sS "$SETU/v1/collections/orders/records" \\',
+    '        -H "authorization: Bearer $SETU_KEY" -H "x-setu-purpose: $p"',
+    '    done',
+    '',
+    '[seed]    delivery_partner  address and name in full, phone as ****5678,',
+    '[seed]                        never the amount',
+    '[seed]    support_chat      name, phone and amount in full, never the address',
+    '[seed]    analytics         city, item and amount only — no name, no address',
+    '',
+    '[seed]    Both gates bite, independently:',
+    '[seed]      - Biju never consented to analytics, so that purpose does not',
+    '[seed]        see his row at all. Row visibility, not field masking.',
+    '[seed]      - Priya withheld her phone from support, so hers reads',
+    "[seed]        '****1111' there while Asha's reads in full. The tenant",
+    '[seed]        granted that field; her consent is what withholds it.',
+    '[seed]      - Every customer consented to phone for delivery_partner, but',
+    '[seed]        the tenant never granted it to that purpose — so it is masked',
+    '[seed]        there regardless. The mirror image of the line above.',
+    '',
+    '[seed] 4. The bypass attempt. Connect as the runtime role the services use',
+    '[seed]    and try to read the table directly — RLS refuses, because the',
+    '[seed]    guarantee is in the database, not in the service.',
+    '',
+    `    psql "postgresql://setu_runtime@localhost/${process.env.POSTGRES_DB ?? 'setu'}" \\`,
+    `      -c 'SELECT * FROM "${SCHEMA}".orders'`,
+    '',
+    '[seed] 5. Consent-bound inference. Build vectors per purpose, then ask the',
+    '[seed]    same question under two of them.',
+    '',
+    '    curl -sS $SETU/v1/ai/embeddings -H "authorization: Bearer $SETU_KEY" \\',
+    '      -H "content-type: application/json" -H "x-setu-purpose: delivery_partner" \\',
+    `      -d '{"collection":"orders"}'`,
+    '',
+    '    curl -sS $SETU/v1/ai/ask -H "authorization: Bearer $SETU_KEY" \\',
+    '      -H "content-type: application/json" -H "x-setu-purpose: delivery_partner" \\',
+    `      -d '{"collection":"orders","question":"where is the Pune order going?"}'`,
+    '',
+    '[seed]    The response carries the context the model was given. Ask the same',
+    '[seed]    under analytics and the address is not in it — so no answer can',
+    '[seed]    contain it, whatever the model does.',
+    '',
+    '[seed] 6. Revoke, then look again. The row leaves retrieval immediately,',
+    '[seed]    and the derived vectors are deleted rather than hidden:',
+    '',
+    '    curl -sS -X POST $SETU/v1/consents/<consent-id>/revoke \\',
+    '      -H "authorization: Bearer $SETU_KEY"',
+    '',
+    `    psql "postgresql://setu@localhost/${process.env.POSTGRES_DB ?? 'setu'}" \\`,
+    "      -c 'SELECT count(*) FROM record_embeddings'",
     '',
   ];
   console.log(lines.join('\n'));
 }
 
-main().catch((err) => {
-  console.error('[seed] failed:', err.message);
-  process.exit(1);
-});
+/**
+ * Only seed when run directly. The constants above are imported by the suite
+ * that checks the claims this script prints are actually true, and importing a
+ * module must not write to a database.
+ */
+if (import.meta.url === pathToFileURL(process.argv[1] ?? '').href) {
+  main().catch((err) => {
+    console.error('[seed] failed:', err.message);
+    process.exit(1);
+  });
+}
