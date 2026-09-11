@@ -1,4 +1,4 @@
-export type ServiceName = 'auth' | 'data' | 'consent' | 'audit' | 'storage' | 'metering';
+export type ServiceName = 'auth' | 'data' | 'consent' | 'audit' | 'storage' | 'metering' | 'functions';
 
 export type Upstreams = Record<ServiceName, string>;
 
@@ -18,6 +18,9 @@ export function upstreamsFromEnv(): Upstreams {
     metering:
       process.env.METERING_SERVICE_URL ??
       `http://localhost:${process.env.METERING_SERVICE_PORT ?? 3008}`,
+    functions:
+      process.env.FUNCTIONS_SERVICE_URL ??
+      `http://localhost:${process.env.FUNCTIONS_SERVICE_PORT ?? 3004}`,
   };
 }
 
@@ -55,6 +58,12 @@ const ROUTES: Route[] = [
    * binds no purpose. The closed meter vocabulary is what keeps that true.
    */
   { match: /^\/v1\/metering(?:\/|$)/, service: 'metering', requiresPurpose: false },
+  /**
+   * Functions binds no purpose at the gateway, deliberately. Whether one is
+   * required depends on what the function declared, which only the service
+   * knows — so it decides, and refuses a mismatch in either direction.
+   */
+  { match: /^\/v1\/functions(?:\/|$)/, service: 'functions', requiresPurpose: false },
   /**
    * Reading the trail is the tenant inspecting their own compliance record, not
    * an access to a data subject's data, so it binds no purpose — auditing an
