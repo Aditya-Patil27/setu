@@ -79,7 +79,11 @@ async function insertFields(
   collectionId: string,
   fields: FieldSpec[],
 ): Promise<void> {
-  const purposeIds = await resolvePurposes(client, projectId, fields.flatMap((f) => f.purposes));
+  const purposeIds = await resolvePurposes(
+    client,
+    projectId,
+    fields.flatMap((f) => f.purposes),
+  );
 
   for (const field of fields) {
     validateField(field);

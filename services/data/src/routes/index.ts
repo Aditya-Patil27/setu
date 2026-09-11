@@ -1,6 +1,6 @@
-import type { FastifyPluginAsync } from "fastify";
-import collections from "./collections.js";
-import records from "./records.js";
+import type { FastifyPluginAsync } from 'fastify';
+import collections from './collections.js';
+import records from './records.js';
 
 /**
  * M4 — Data Service routes.

@@ -63,10 +63,9 @@ export function validateField(field: FieldSpec): ColumnType {
   // A unique or indexed column is compared and ordered by the database in the
   // clear. Allowing that on a sensitive field would undercut the masking.
   if (field.sensitivity === 'sensitive' && field.unique) {
-    throw new ValidationError(
-      `Field '${field.name}' cannot be both sensitive and unique`,
-      { field: field.name },
-    );
+    throw new ValidationError(`Field '${field.name}' cannot be both sensitive and unique`, {
+      field: field.name,
+    });
   }
 
   return type;

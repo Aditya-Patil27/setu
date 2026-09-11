@@ -66,9 +66,7 @@ beforeAll(async () => {
     headers: headers(),
     payload: {
       name: 'patients',
-      fields: [
-        { name: 'full_name', type: 'text', mask: 'redact', purposes: [SUPPORT, ANALYTICS] },
-      ],
+      fields: [{ name: 'full_name', type: 'text', mask: 'redact', purposes: [SUPPORT, ANALYTICS] }],
     },
   });
   if (declared.statusCode !== 201) throw new Error(`declare: ${declared.body}`);
@@ -266,10 +264,9 @@ describe('tamper evidence', () => {
     const victim = rows.rows[1].id;
     const successor = rows.rows[2].id;
 
-    const saved = await testPool('owner').query(
-      `SELECT * FROM audit_records WHERE id = $1`,
-      [victim],
-    );
+    const saved = await testPool('owner').query(`SELECT * FROM audit_records WHERE id = $1`, [
+      victim,
+    ]);
     await testPool('owner').query(`DELETE FROM audit_records WHERE id = $1`, [victim]);
 
     try {
@@ -287,8 +284,18 @@ describe('tamper evidence', () => {
          OVERRIDING SYSTEM VALUE
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
         [
-          r.id, r.seq, r.project_id, r.principal_id, r.purpose_id, r.action, r.resource,
-          r.fields, r.outcome, r.prev_hash, r.hash, r.created_at,
+          r.id,
+          r.seq,
+          r.project_id,
+          r.principal_id,
+          r.purpose_id,
+          r.action,
+          r.resource,
+          r.fields,
+          r.outcome,
+          r.prev_hash,
+          r.hash,
+          r.created_at,
         ],
       );
     }

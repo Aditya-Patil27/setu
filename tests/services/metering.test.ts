@@ -122,9 +122,7 @@ describe('the meter vocabulary is closed', () => {
    * metering consults consent at all.
    */
   it('refuses a metric that encodes a fact about someone', async () => {
-    const res = await ingest([
-      { service: 'data', metric: 'read.asha_menon.hiv_status', value: 1 },
-    ]);
+    const res = await ingest([{ service: 'data', metric: 'read.asha_menon.hiv_status', value: 1 }]);
     expect(res.statusCode).toBe(400);
   });
 
@@ -153,7 +151,10 @@ describe('the meter vocabulary is closed', () => {
     });
     expect(res.statusCode).toBe(200);
     expect(res.json().meters).toContainEqual(
-      expect.objectContaining({ service: 'gateway', metrics: expect.arrayContaining(['requests']) }),
+      expect.objectContaining({
+        service: 'gateway',
+        metrics: expect.arrayContaining(['requests']),
+      }),
     );
   });
 });

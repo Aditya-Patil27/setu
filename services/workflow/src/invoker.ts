@@ -46,7 +46,10 @@ export function createHttpInvoker(baseUrl: string, signingSecret: string): StepI
           method: 'POST',
           headers: {
             'content-type': 'application/json',
-            ...contextToHeaders({ ...context, requestId: context.requestId || randomUUID() }, signingSecret),
+            ...contextToHeaders(
+              { ...context, requestId: context.requestId || randomUUID() },
+              signingSecret,
+            ),
           },
           body: JSON.stringify({ input }),
         });
@@ -58,7 +61,11 @@ export function createHttpInvoker(baseUrl: string, signingSecret: string): StepI
 
       const text = await response.text();
       if (!response.ok) {
-        return { status: 'failed', output: null, error: `invoke failed (${response.status}): ${text}` };
+        return {
+          status: 'failed',
+          output: null,
+          error: `invoke failed (${response.status}): ${text}`,
+        };
       }
 
       try {
@@ -75,7 +82,11 @@ export function createHttpInvoker(baseUrl: string, signingSecret: string): StepI
         }
         return { status: 'succeeded', output: body.output };
       } catch {
-        return { status: 'failed', output: null, error: 'functions service returned unparseable body' };
+        return {
+          status: 'failed',
+          output: null,
+          error: 'functions service returned unparseable body',
+        };
       }
     },
   };

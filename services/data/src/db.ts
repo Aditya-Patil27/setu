@@ -1,5 +1,5 @@
-import type pg from "pg";
-import { createRolePool } from "@setu/db";
+import type pg from 'pg';
+import { createRolePool } from '@setu/db';
 
 /**
  * The Data service is the only service that holds two roles.
@@ -19,8 +19,8 @@ export interface Pools {
 
 export function createPools(): Pools {
   return {
-    runtime: createRolePool("runtime"),
-    owner: createRolePool("owner"),
+    runtime: createRolePool('runtime'),
+    owner: createRolePool('owner'),
   };
 }
 

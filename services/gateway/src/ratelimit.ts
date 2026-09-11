@@ -35,7 +35,10 @@ export class TokenBuckets {
     const bucket = this.buckets.get(key) ?? { tokens: this.opts.capacity, updatedAt: now };
 
     const elapsed = Math.max(0, now - bucket.updatedAt) / 1000;
-    bucket.tokens = Math.min(this.opts.capacity, bucket.tokens + elapsed * this.opts.refillPerSecond);
+    bucket.tokens = Math.min(
+      this.opts.capacity,
+      bucket.tokens + elapsed * this.opts.refillPerSecond,
+    );
     bucket.updatedAt = now;
 
     const allowed = bucket.tokens >= 1;

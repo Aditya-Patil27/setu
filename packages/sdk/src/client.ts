@@ -74,7 +74,7 @@ class QueryBuilder {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${this.apiKey}`,
+        Authorization: `Bearer ${this.apiKey}`,
         [SETU.HEADERS.PURPOSE]: this.purpose ?? '',
       },
       body: JSON.stringify({
@@ -85,12 +85,10 @@ class QueryBuilder {
 
     if (!response.ok) {
       const body = await response.json().catch(() => ({}));
-      throw new Error(
-        `Setu API error ${response.status}: ${JSON.stringify(body)}`,
-      );
+      throw new Error(`Setu API error ${response.status}: ${JSON.stringify(body)}`);
     }
 
-    const body = await response.json() as { data: unknown[] };
+    const body = (await response.json()) as { data: unknown[] };
     return body.data;
   }
 }

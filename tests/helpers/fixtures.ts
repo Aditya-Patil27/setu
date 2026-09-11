@@ -60,7 +60,9 @@ export async function provisionProject(hint = 'proj'): Promise<TestProject> {
   );
 
   await owner.query(`CREATE SCHEMA IF NOT EXISTS ${quoteIdent(schemaName)}`);
-  await owner.query(`GRANT USAGE ON SCHEMA ${quoteIdent(schemaName)} TO setu_runtime, setu_control`);
+  await owner.query(
+    `GRANT USAGE ON SCHEMA ${quoteIdent(schemaName)} TO setu_runtime, setu_control`,
+  );
 
   return { tenantId, projectId: project.rows[0].id, schemaName, slug };
 }

@@ -1,5 +1,5 @@
-import type pg from "pg";
-import { withContext, type DbContext } from "@setu/db";
+import type pg from 'pg';
+import { withContext, type DbContext } from '@setu/db';
 
 /**
  * Audit writes for the Data service.
@@ -37,28 +37,22 @@ export interface AccessRecord {
   /** The data subject the accessed row is about — the subject of the audit row. */
   principalId: string;
   purposeId: string;
-  action: "read" | "list" | "create" | "update" | "delete";
+  action: 'read' | 'list' | 'create' | 'update' | 'delete';
   resource: string;
   fields: string[];
 }
 
 /** Append one hash-chained entry. Must run inside the caller's transaction. */
-export async function appendAudit(
-  client: pg.PoolClient,
-  rec: AccessRecord,
-): Promise<void> {
-  await client.query(
-    `SELECT public.setu_append_audit($1, $2, $3, $4, $5, $6::text[], $7)`,
-    [
-      rec.projectId,
-      rec.principalId,
-      rec.purposeId,
-      rec.action,
-      rec.resource,
-      rec.fields,
-      "permitted",
-    ],
-  );
+export async function appendAudit(client: pg.PoolClient, rec: AccessRecord): Promise<void> {
+  await client.query(`SELECT public.setu_append_audit($1, $2, $3, $4, $5, $6::text[], $7)`, [
+    rec.projectId,
+    rec.principalId,
+    rec.purposeId,
+    rec.action,
+    rec.resource,
+    rec.fields,
+    'permitted',
+  ]);
 }
 
 export interface DenialRecord {
@@ -67,7 +61,7 @@ export interface DenialRecord {
   tableName: string;
   recordId: string | null;
   purposeId: string;
-  action: AccessRecord["action"];
+  action: AccessRecord['action'];
   fields: string[];
 }
 
@@ -98,7 +92,7 @@ export async function recordDenial(
   ctx: DbContext,
   rec: DenialRecord,
 ): Promise<void> {
-  const uuidNil = "00000000-0000-0000-0000-000000000000";
+  const uuidNil = '00000000-0000-0000-0000-000000000000';
   await withContext(pool, ctx, async (client) => {
     await client.query(
       `SELECT public.setu_audit_denial($1, $2, $3, $4::uuid, $5, $6, $7::text[])`,

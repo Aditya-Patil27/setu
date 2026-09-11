@@ -137,9 +137,9 @@ export function createSubprocessRuntime(): FunctionRuntime {
               env: { NODE_ENV: 'production', PATH: process.env.PATH ?? '' },
             },
             (err, stdout, stderr) => {
-              const killed = Boolean(
-                err && ('killed' in err ? err.killed : false) === true,
-              ) || (err as { signal?: string } | null)?.signal === 'SIGKILL';
+              const killed =
+                Boolean(err && ('killed' in err ? err.killed : false) === true) ||
+                (err as { signal?: string } | null)?.signal === 'SIGKILL';
               resolve({
                 code: (err as { code?: number } | null)?.code ?? (err ? 1 : 0),
                 stdout: String(stdout ?? ''),

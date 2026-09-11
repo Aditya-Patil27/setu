@@ -38,7 +38,7 @@ export interface Principal {
 }
 
 export interface JwtPayload {
-  sub: string;          // principal ID
+  sub: string; // principal ID
   tenantId: string;
   projectId: string;
   roles: string[];
@@ -63,7 +63,7 @@ export type ConsentStatus = 'active' | 'expired' | 'revoked';
 export interface Purpose {
   id: string;
   projectId: string;
-  name: string;          // e.g., 'appointment_reminder'
+  name: string; // e.g., 'appointment_reminder'
   description: string;
   legalBasis: string;
   createdAt: Date;
@@ -73,7 +73,7 @@ export interface ConsentArtifact {
   id: string;
   principalId: string;
   purposeId: string;
-  fields: string[];       // granted fields
+  fields: string[]; // granted fields
   grantedAt: Date;
   expiresAt?: Date;
   revokedAt?: Date;
@@ -82,11 +82,7 @@ export interface ConsentArtifact {
 
 // ── Audit & Lineage ──────────────────────────────────────
 
-export type AuditEdgeType =
-  | 'accessed'
-  | 'derived-from'
-  | 'transmitted-to'
-  | 'delegated-to';
+export type AuditEdgeType = 'accessed' | 'derived-from' | 'transmitted-to' | 'delegated-to';
 
 export interface AuditEdge {
   id: string;
@@ -126,7 +122,7 @@ export interface FunctionDefinition {
   name: string;
   runtime: 'js';
   entrypoint: string;
-  timeout: number;        // seconds
+  timeout: number; // seconds
   memoryMb: number;
   createdAt: Date;
 }
@@ -150,15 +146,15 @@ export interface WorkflowDefinition {
   projectId: string;
   name: string;
   dag: WorkflowStep[];
-  schedule?: string;      // cron expression
+  schedule?: string; // cron expression
   createdAt: Date;
 }
 
 export interface WorkflowStep {
   id: string;
   functionId: string;
-  dependsOn: string[];    // step IDs
-  purpose?: string;       // inherits from parent if not set
+  dependsOn: string[]; // step IDs
+  purpose?: string; // inherits from parent if not set
 }
 
 export interface WorkflowExecution {

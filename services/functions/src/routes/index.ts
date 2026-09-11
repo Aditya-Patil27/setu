@@ -29,7 +29,11 @@ const FunctionName = z
   .max(64)
   .regex(/^[a-z][a-z0-9_-]*$/, 'must be lower-kebab or snake case, starting with a letter');
 
-const PurposeName = z.string().min(1).max(64).regex(/^[a-z][a-z0-9_]*$/);
+const PurposeName = z
+  .string()
+  .min(1)
+  .max(64)
+  .regex(/^[a-z][a-z0-9_]*$/);
 
 const MAX_SOURCE_BYTES = 128 * 1024;
 
@@ -211,9 +215,7 @@ const routes: FastifyPluginAsync = async (app) => {
       throw new ValidationError('Function has no source to run', { function: fn.name });
     }
 
-    const purposeId = ctx.purpose
-      ? await resolvePurposeId(ctx.projectId, ctx.purpose)
-      : null;
+    const purposeId = ctx.purpose ? await resolvePurposeId(ctx.projectId, ctx.purpose) : null;
 
     const execution = await app.pools.control.query<ExecutionRow>(
       `INSERT INTO function_executions

@@ -146,10 +146,7 @@ describe('otp sign-in', () => {
   it('issues a token the gateway can verify, with the claims it reads', async () => {
     const session = await signIn();
 
-    const { payload } = await jwtVerify(
-      session.accessToken,
-      new TextEncoder().encode(JWT_SECRET),
-    );
+    const { payload } = await jwtVerify(session.accessToken, new TextEncoder().encode(JWT_SECRET));
     // The gateway reads exactly these two claims; renaming either breaks it.
     expect(payload.sub).toBe(session.principalId);
     expect(payload.project_id).toBe(project.projectId);
@@ -172,8 +169,26 @@ describe('otp sign-in', () => {
     const challengeId = started.json().challengeId;
 
     const body = { challengeId, code: MOCK_CODE };
-    expect((await app.inject({ method: 'POST', url: '/v1/auth/otp/verify', headers: headers(), payload: body })).statusCode).toBe(200);
-    expect((await app.inject({ method: 'POST', url: '/v1/auth/otp/verify', headers: headers(), payload: body })).statusCode).toBe(401);
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/v1/auth/otp/verify',
+          headers: headers(),
+          payload: body,
+        })
+      ).statusCode,
+    ).toBe(200);
+    expect(
+      (
+        await app.inject({
+          method: 'POST',
+          url: '/v1/auth/otp/verify',
+          headers: headers(),
+          payload: body,
+        })
+      ).statusCode,
+    ).toBe(401);
   });
 
   it('stops guessing after five wrong codes', async () => {

@@ -236,7 +236,7 @@ describe('principal-facing routes', () => {
     expect(res.statusCode).toBe(401);
   });
 
-  it('lists only the calling principal\'s consents', async () => {
+  it("lists only the calling principal's consents", async () => {
     const otherPrincipal = await createPrincipal(project.projectId, { phone: '+919900000002' });
     await createPurpose(project.projectId, 'support');
     await app.inject({
@@ -258,7 +258,7 @@ describe('principal-facing routes', () => {
     expect(returned.every((c) => c.principalId === principalId)).toBe(true);
   });
 
-  it('will not let a principal revoke somebody else\'s consent', async () => {
+  it("will not let a principal revoke somebody else's consent", async () => {
     const victim = await createPrincipal(project.projectId, { phone: '+919900000003' });
     const granted = await app.inject({
       method: 'POST',

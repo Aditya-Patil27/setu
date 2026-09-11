@@ -37,7 +37,12 @@ const CreateObject = z.object({
   /** Absent means the object is about nobody — a tenant asset, not personal data. */
   principalId: z.string().uuid().optional(),
   purposeTags: z
-    .array(z.string().regex(/^[a-z][a-z0-9_]*$/).max(64))
+    .array(
+      z
+        .string()
+        .regex(/^[a-z][a-z0-9_]*$/)
+        .max(64),
+    )
     .max(20)
     .default([]),
   contentType: z.string().max(200).default('application/octet-stream'),

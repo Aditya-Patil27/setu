@@ -1,13 +1,8 @@
-import type { FastifyPluginAsync } from "fastify";
-import type pg from "pg";
-import { z } from "zod";
-import {
-  NotFoundError,
-  contextFromHeaders,
-  parseInput,
-  ValidationError,
-} from "@setu/shared";
-import { CONSENT_CHANGED } from "../events.js";
+import type { FastifyPluginAsync } from 'fastify';
+import type pg from 'pg';
+import { z } from 'zod';
+import { NotFoundError, contextFromHeaders, parseInput, ValidationError } from '@setu/shared';
+import { CONSENT_CHANGED } from '../events.js';
 
 const CreateConsent = z.object({
   principalId: z.string().uuid(),
@@ -63,16 +58,12 @@ export const ARTIFACT_COLUMNS = `
  * project_id explicitly. Getting this wrong would leak another tenant's consent
  * state, which no amount of downstream RLS would catch.
  */
-async function requirePurposeId(
-  client: pg.Pool,
-  projectId: string,
-  name: string,
-): Promise<string> {
+async function requirePurposeId(client: pg.Pool, projectId: string, name: string): Promise<string> {
   const res = await client.query<{ id: string }>(
     `SELECT id FROM purposes WHERE project_id = $1 AND name = $2`,
     [projectId, name],
   );
-  if (!res.rowCount) throw new NotFoundError("Purpose", name);
+  if (!res.rowCount) throw new NotFoundError('Purpose', name);
   return res.rows[0].id;
 }
 
@@ -81,11 +72,11 @@ async function requirePrincipalInProject(
   projectId: string,
   principalId: string,
 ): Promise<void> {
-  const res = await client.query(
-    `SELECT 1 FROM principals WHERE id = $1 AND project_id = $2`,
-    [principalId, projectId],
-  );
-  if (!res.rowCount) throw new NotFoundError("Principal", principalId);
+  const res = await client.query(`SELECT 1 FROM principals WHERE id = $1 AND project_id = $2`, [
+    principalId,
+    projectId,
+  ]);
+  if (!res.rowCount) throw new NotFoundError('Principal', principalId);
 }
 
 const routes: FastifyPluginAsync = async (app) => {
@@ -96,12 +87,12 @@ const routes: FastifyPluginAsync = async (app) => {
    * two simultaneously active artifacts would make "what did they agree to"
    * ambiguous, and the RLS policy would honour whichever matched first.
    */
-  app.post("/consents", async (request, reply) => {
+  app.post('/consents', async (request, reply) => {
     const ctx = contextFromHeaders(request.headers, app.signingSecret);
-    const body = parseInput(CreateConsent, request.body, "consent");
+    const body = parseInput(CreateConsent, request.body, 'consent');
 
     if (body.expiresAt && new Date(body.expiresAt) <= new Date()) {
-      throw new ValidationError("expiresAt must be in the future", {
+      throw new ValidationError('expiresAt must be in the future', {
         expiresAt: body.expiresAt,
       });
     }
@@ -112,7 +103,7 @@ const routes: FastifyPluginAsync = async (app) => {
 
     const client = await pool.connect();
     try {
-      await client.query("BEGIN");
+      await client.query('BEGIN');
 
       await client.query(
         `UPDATE consent_artifacts SET status = 'revoked', revoked_at = now()
@@ -126,7 +117,7 @@ const routes: FastifyPluginAsync = async (app) => {
         [body.principalId, purposeId, body.fields, body.expiresAt ?? null],
       );
 
-      await client.query("COMMIT");
+      await client.query('COMMIT');
 
       const res = await pool.query<ArtifactRow>(
         `SELECT ${ARTIFACT_COLUMNS} FROM consent_artifacts ca
@@ -139,21 +130,21 @@ const routes: FastifyPluginAsync = async (app) => {
         projectId: ctx.projectId,
         principalId: body.principalId,
         purpose: body.purpose,
-        action: "granted",
+        action: 'granted',
       });
 
       return reply.status(201).send(presentArtifact(res.rows[0]));
     } catch (err) {
-      await client.query("ROLLBACK");
+      await client.query('ROLLBACK');
       throw err;
     } finally {
       client.release();
     }
   });
 
-  app.get("/consents", async (request) => {
+  app.get('/consents', async (request) => {
     const ctx = contextFromHeaders(request.headers, app.signingSecret);
-    const query = parseInput(ListQuery, request.query, "query");
+    const query = parseInput(ListQuery, request.query, 'query');
 
     const res = await app.pools.control.query<ArtifactRow>(
       `SELECT ${ARTIFACT_COLUMNS}
@@ -169,16 +160,14 @@ const routes: FastifyPluginAsync = async (app) => {
     return { consents: res.rows.map(presentArtifact) };
   });
 
-  app.post<{ Params: { id: string } }>(
-    "/consents/:id/revoke",
-    async (request) => {
-      const ctx = contextFromHeaders(request.headers, app.signingSecret);
+  app.post<{ Params: { id: string } }>('/consents/:id/revoke', async (request) => {
+    const ctx = contextFromHeaders(request.headers, app.signingSecret);
 
-      const res = await app.pools.control.query<{
-        id: string;
-        purpose_name: string;
-      }>(
-        `UPDATE consent_artifacts ca
+    const res = await app.pools.control.query<{
+      id: string;
+      purpose_name: string;
+    }>(
+      `UPDATE consent_artifacts ca
           SET status = 'revoked', revoked_at = now()
          FROM principals pr, purposes p
         WHERE ca.id = $1
@@ -187,22 +176,20 @@ const routes: FastifyPluginAsync = async (app) => {
           AND pr.project_id = $2
           AND ca.status = 'active'
       RETURNING ca.id, p.name AS purpose_name`,
-        [request.params.id, ctx.projectId],
-      );
+      [request.params.id, ctx.projectId],
+    );
 
-      if (!res.rowCount)
-        throw new NotFoundError("Active consent artifact", request.params.id);
+    if (!res.rowCount) throw new NotFoundError('Active consent artifact', request.params.id);
 
-      await app.events.publish(CONSENT_CHANGED, {
-        projectId: ctx.projectId,
-        consentId: res.rows[0].id,
-        purpose: res.rows[0].purpose_name,
-        action: "revoked",
-      });
+    await app.events.publish(CONSENT_CHANGED, {
+      projectId: ctx.projectId,
+      consentId: res.rows[0].id,
+      purpose: res.rows[0].purpose_name,
+      action: 'revoked',
+    });
 
-      return { id: res.rows[0].id, status: "revoked" };
-    },
-  );
+    return { id: res.rows[0].id, status: 'revoked' };
+  });
 
   /**
    * Advisory only — for dashboards and debugging.
@@ -212,9 +199,9 @@ const routes: FastifyPluginAsync = async (app) => {
    * decision back into application code, which is the thing this platform exists
    * to avoid. The answer here can also be stale by the time a caller acts on it.
    */
-  app.get("/consents/check", async (request) => {
+  app.get('/consents/check', async (request) => {
     const ctx = contextFromHeaders(request.headers, app.signingSecret);
-    const query = parseInput(CheckQuery, request.query, "query");
+    const query = parseInput(CheckQuery, request.query, 'query');
 
     const res = await app.pools.control.query<{ fields: string[] }>(
       `SELECT ca.fields

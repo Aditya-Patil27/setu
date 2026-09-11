@@ -334,12 +334,8 @@ describe('masked columns cannot be used as an oracle', () => {
     // The two answers differ only where they echo the caller's own input, which
     // tells them nothing they did not just send. Neither reveals that
     // full_name exists on this collection and no_such_field does not.
-    expect(ungranted.json().error.message).toBe(
-      "Field 'full_name' cannot be used in this query",
-    );
-    expect(absent.json().error.message).toBe(
-      "Field 'no_such_field' cannot be used in this query",
-    );
+    expect(ungranted.json().error.message).toBe("Field 'full_name' cannot be used in this query");
+    expect(absent.json().error.message).toBe("Field 'no_such_field' cannot be used in this query");
   });
 });
 

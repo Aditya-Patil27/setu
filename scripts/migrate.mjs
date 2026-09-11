@@ -70,8 +70,12 @@ async function main() {
 
     // Roles are created without a password by 002; set it here so credentials
     // are never committed to a migration file.
-    await client.query(`ALTER ROLE setu_runtime WITH PASSWORD $1`.replace('$1', quote(RUNTIME_PASSWORD)));
-    await client.query(`ALTER ROLE setu_control WITH PASSWORD $1`.replace('$1', quote(CONTROL_PASSWORD)));
+    await client.query(
+      `ALTER ROLE setu_runtime WITH PASSWORD $1`.replace('$1', quote(RUNTIME_PASSWORD)),
+    );
+    await client.query(
+      `ALTER ROLE setu_control WITH PASSWORD $1`.replace('$1', quote(CONTROL_PASSWORD)),
+    );
     console.log('[migrate] runtime role passwords set');
   } finally {
     await client.end();

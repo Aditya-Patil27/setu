@@ -83,7 +83,11 @@ const advance = (id: string, purpose?: string) =>
   });
 
 const run = (id: string, purpose?: string) =>
-  app.inject({ method: 'POST', url: `/v1/workflows/executions/${id}/run`, headers: headers(purpose) });
+  app.inject({
+    method: 'POST',
+    url: `/v1/workflows/executions/${id}/run`,
+    headers: headers(purpose),
+  });
 
 const inspect = (id: string) =>
   app.inject({ method: 'GET', url: `/v1/workflows/executions/${id}`, headers: headers() });

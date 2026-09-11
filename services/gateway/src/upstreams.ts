@@ -1,12 +1,15 @@
-export type ServiceName = 'auth' | 'data' | 'consent' | 'audit' | 'storage' | 'metering' | 'functions' | 'workflow';
+export type ServiceName =
+  'auth' | 'data' | 'consent' | 'audit' | 'storage' | 'metering' | 'functions' | 'workflow';
 
 export type Upstreams = Record<ServiceName, string>;
 
 /** Upstream base URLs. Compose supplies the service names; localhost is the dev fallback. */
 export function upstreamsFromEnv(): Upstreams {
   return {
-    auth: process.env.AUTH_SERVICE_URL ?? `http://localhost:${process.env.AUTH_SERVICE_PORT ?? 3001}`,
-    data: process.env.DATA_SERVICE_URL ?? `http://localhost:${process.env.DATA_SERVICE_PORT ?? 3002}`,
+    auth:
+      process.env.AUTH_SERVICE_URL ?? `http://localhost:${process.env.AUTH_SERVICE_PORT ?? 3001}`,
+    data:
+      process.env.DATA_SERVICE_URL ?? `http://localhost:${process.env.DATA_SERVICE_PORT ?? 3002}`,
     consent:
       process.env.CONSENT_SERVICE_URL ??
       `http://localhost:${process.env.CONSENT_SERVICE_PORT ?? 3005}`,

@@ -1,13 +1,9 @@
-import type pg from "pg";
-import {
-  ConsentDeniedError,
-  NotFoundError,
-  ValidationError,
-} from "@setu/shared";
-import { withContext } from "@setu/db";
-import { quoteIdent, qualify, TYPE_ALLOWLIST } from "../ddl/identifiers.js";
-import type { CollectionRecord } from "../ddl/collections.js";
-import { appendAudit, purposeId, recordDenial } from "./audit.js";
+import type pg from 'pg';
+import { ConsentDeniedError, NotFoundError, ValidationError } from '@setu/shared';
+import { withContext } from '@setu/db';
+import { quoteIdent, qualify, TYPE_ALLOWLIST } from '../ddl/identifiers.js';
+import type { CollectionRecord } from '../ddl/collections.js';
+import { appendAudit, purposeId, recordDenial } from './audit.js';
 
 /**
  * Record access. Every statement here runs through `withContext`, which pins
@@ -17,14 +13,14 @@ import { appendAudit, purposeId, recordDenial } from "./audit.js";
  */
 
 /** SQLSTATE raised when an RLS WITH CHECK clause rejects a write. */
-const CONSENT_VIOLATION = "42501";
+const CONSENT_VIOLATION = '42501';
 /** SQLSTATE raised when a bind value cannot be cast to the column's type. */
-const INVALID_TEXT_REPRESENTATION = "22P02";
+const INVALID_TEXT_REPRESENTATION = '22P02';
 
 type PgError = { code?: string };
 
 function sqlState(err: unknown): string | undefined {
-  if (typeof err !== "object" || err === null) return undefined;
+  if (typeof err !== 'object' || err === null) return undefined;
   return (err as PgError).code;
 }
 
@@ -33,20 +29,20 @@ function sqlState(err: unknown): string | undefined {
  * available to filters and sorts.
  */
 const SYSTEM_COLUMNS = {
-  id: "UUID",
-  principal_id: "UUID",
-  created_at: "TIMESTAMPTZ",
-  updated_at: "TIMESTAMPTZ",
+  id: 'UUID',
+  principal_id: 'UUID',
+  created_at: 'TIMESTAMPTZ',
+  updated_at: 'TIMESTAMPTZ',
 } as const;
 
-const RANGE_OPERATORS = ["gt", "gte", "lt", "lte"] as const;
+const RANGE_OPERATORS = ['gt', 'gte', 'lt', 'lte'] as const;
 type RangeOperator = (typeof RANGE_OPERATORS)[number];
 
 const OPERATOR_SQL: Record<RangeOperator, string> = {
-  gt: ">",
-  gte: ">=",
-  lt: "<",
-  lte: "<=",
+  gt: '>',
+  gte: '>=',
+  lt: '<',
+  lte: '<=',
 };
 
 export interface ListQuery {
@@ -54,7 +50,7 @@ export interface ListQuery {
   equalities: Array<{ column: string; value: string }>;
   ranges: Array<{ column: string; op: RangeOperator; value: string }>;
   sortColumn: string;
-  sortDirection: "asc" | "desc";
+  sortDirection: 'asc' | 'desc';
   limit: number;
   cursor?: string;
 }
@@ -99,11 +95,9 @@ export function assertColumnQueryable(
 
 /** SQL cast target for a column value, resolved from the declaration allowlist. */
 function castFor(column: string, collection: CollectionRecord): string {
-  if (column in SYSTEM_COLUMNS)
-    return SYSTEM_COLUMNS[column as keyof typeof SYSTEM_COLUMNS];
+  if (column in SYSTEM_COLUMNS) return SYSTEM_COLUMNS[column as keyof typeof SYSTEM_COLUMNS];
   const field = collection.fields.find((f) => f.name === column);
-  if (!field)
-    throw new ValidationError(`Unknown field '${column}'`, { field: column });
+  if (!field) throw new ValidationError(`Unknown field '${column}'`, { field: column });
   return TYPE_ALLOWLIST[field.type].sql;
 }
 
@@ -111,7 +105,7 @@ function castFor(column: string, collection: CollectionRecord): string {
 
 const MAX_LIMIT = 100;
 const DEFAULT_LIMIT = 20;
-const DEFAULT_SORT_COLUMN = "created_at";
+const DEFAULT_SORT_COLUMN = 'created_at';
 
 /**
  * Parse the raw querystring into a validated ListQuery.
@@ -125,10 +119,10 @@ export function parseListQuery(
   purpose: string,
   raw: Record<string, unknown>,
 ): ListQuery {
-  const equalities: ListQuery["equalities"] = [];
-  const ranges: ListQuery["ranges"] = [];
+  const equalities: ListQuery['equalities'] = [];
+  const ranges: ListQuery['ranges'] = [];
   let sortColumn = DEFAULT_SORT_COLUMN;
-  let sortDirection: ListQuery["sortDirection"] = "desc";
+  let sortDirection: ListQuery['sortDirection'] = 'desc';
   let limit = DEFAULT_LIMIT;
   let cursor: string | undefined;
 
@@ -139,29 +133,26 @@ export function parseListQuery(
       });
     }
 
-    if (key === "cursor") {
+    if (key === 'cursor') {
       decodeCursor(String(value)); // fail fast on garbage before any SQL runs
       cursor = String(value);
       continue;
     }
 
-    if (key === "limit") {
+    if (key === 'limit') {
       const parsed = Number(value);
       if (!Number.isInteger(parsed) || parsed < 1 || parsed > MAX_LIMIT) {
-        throw new ValidationError(
-          `limit must be an integer between 1 and ${MAX_LIMIT}`,
-          {
-            limit: value,
-          },
-        );
+        throw new ValidationError(`limit must be an integer between 1 and ${MAX_LIMIT}`, {
+          limit: value,
+        });
       }
       limit = parsed;
       continue;
     }
 
-    if (key === "sort") {
-      const [column, direction = "desc"] = String(value).split(":");
-      if (direction !== "asc" && direction !== "desc") {
+    if (key === 'sort') {
+      const [column, direction = 'desc'] = String(value).split(':');
+      if (direction !== 'asc' && direction !== 'desc') {
         throw new ValidationError("sort direction must be 'asc' or 'desc'", {
           sort: value,
         });
@@ -171,7 +162,7 @@ export function parseListQuery(
       continue;
     }
 
-    const dot = key.indexOf(".");
+    const dot = key.indexOf('.');
     const base = dot === -1 ? key : key.slice(0, dot);
     const suffix = dot === -1 ? undefined : key.slice(dot + 1);
 
@@ -219,16 +210,11 @@ export function parseListQuery(
   return { equalities, ranges, sortColumn, sortDirection, limit, cursor };
 }
 
-function encodeCursor(
-  sortColumn: string,
-  direction: string,
-  value: unknown,
-  id: string,
-): string {
+function encodeCursor(sortColumn: string, direction: string, value: unknown, id: string): string {
   return Buffer.from(
     JSON.stringify({ c: sortColumn, d: direction, v: value, id }),
-    "utf8",
-  ).toString("base64url");
+    'utf8',
+  ).toString('base64url');
 }
 
 function decodeCursor(raw: string): {
@@ -238,18 +224,18 @@ function decodeCursor(raw: string): {
   id: string;
 } {
   try {
-    const decoded = JSON.parse(Buffer.from(raw, "base64url").toString("utf8"));
+    const decoded = JSON.parse(Buffer.from(raw, 'base64url').toString('utf8'));
     if (
-      typeof decoded !== "object" ||
+      typeof decoded !== 'object' ||
       decoded === null ||
-      typeof (decoded as { c?: unknown }).c !== "string" ||
-      typeof (decoded as { id?: unknown }).id !== "string"
+      typeof (decoded as { c?: unknown }).c !== 'string' ||
+      typeof (decoded as { id?: unknown }).id !== 'string'
     ) {
-      throw new Error("malformed");
+      throw new Error('malformed');
     }
     return decoded as { c: string; d: string; v: unknown; id: string };
   } catch {
-    throw new ValidationError("cursor is malformed", {
+    throw new ValidationError('cursor is malformed', {
       cursor: raw.slice(0, 32),
     });
   }
@@ -273,13 +259,13 @@ function present(row: RawRow): Record<string, unknown> {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(row)) {
     switch (key) {
-      case "principal_id":
+      case 'principal_id':
         out.principalId = value;
         break;
-      case "created_at":
+      case 'created_at':
         out.createdAt = value;
         break;
-      case "updated_at":
+      case 'updated_at':
         out.updatedAt = value;
         break;
       default:
@@ -293,12 +279,9 @@ function present(row: RawRow): Record<string, unknown> {
 
 function mapPgError(err: unknown, purpose: string, fields: string[]): Error {
   const state = sqlState(err);
-  if (state === CONSENT_VIOLATION)
-    return new ConsentDeniedError(purpose, fields);
+  if (state === CONSENT_VIOLATION) return new ConsentDeniedError(purpose, fields);
   if (state === INVALID_TEXT_REPRESENTATION) {
-    return new ValidationError(
-      "A filter value is not valid for its field type",
-    );
+    return new ValidationError('A filter value is not valid for its field type');
   }
   return err instanceof Error ? err : new Error(String(err));
 }
@@ -333,12 +316,9 @@ export async function createRecord(
   const declared = new Set(collection.fields.map((f) => f.name));
   for (const name of Object.keys(input.fields)) {
     if (!declared.has(name)) {
-      throw new ValidationError(
-        `Unknown field '${name}' on collection '${collection.name}'`,
-        {
-          field: name,
-        },
-      );
+      throw new ValidationError(`Unknown field '${name}' on collection '${collection.name}'`, {
+        field: name,
+      });
     }
   }
   for (const field of collection.fields) {
@@ -349,11 +329,9 @@ export async function createRecord(
     }
   }
 
-  const columns = ["principal_id", ...Object.keys(input.fields)];
+  const columns = ['principal_id', ...Object.keys(input.fields)];
   const values = [input.principalId, ...Object.values(input.fields)];
-  const placeholders = columns.map(
-    (col, i) => `$${i + 1}::${castFor(col, collection)}`,
-  );
+  const placeholders = columns.map((col, i) => `$${i + 1}::${castFor(col, collection)}`);
 
   return withContext(pool, ctx, async (client) => {
     const pid = await purposeId(client, ctx.projectId, ctx.purpose);
@@ -363,8 +341,8 @@ export async function createRecord(
     let rowPrincipalId: string;
     try {
       const res = await client.query<{ id: string; principal_id: string }>(
-        `INSERT INTO ${table} (${columns.map(quoteIdent).join(", ")})
-         VALUES (${placeholders.join(", ")})
+        `INSERT INTO ${table} (${columns.map(quoteIdent).join(', ')})
+         VALUES (${placeholders.join(', ')})
          RETURNING id, principal_id`,
         values,
       );
@@ -378,7 +356,7 @@ export async function createRecord(
       projectId: ctx.projectId,
       principalId: rowPrincipalId,
       purposeId: pid,
-      action: "create",
+      action: 'create',
       resource: `${collection.schemaName}.${collection.tableName}/${insertedId}`,
       fields: Object.keys(input.fields),
     });
@@ -420,17 +398,17 @@ export async function getRecord(
         tableName: collection.tableName,
         recordId,
         purposeId: pid,
-        action: "read",
+        action: 'read',
         fields: collection.fields.map((f) => f.name),
       });
-      throw new NotFoundError("Record", recordId);
+      throw new NotFoundError('Record', recordId);
     }
 
     await appendAudit(client, {
       projectId: ctx.projectId,
       principalId: res.rows[0].principal_id,
       purposeId: pid,
-      action: "read",
+      action: 'read',
       resource: `${collection.schemaName}.${collection.tableName}/${recordId}`,
       fields: collection.fields.map((f) => f.name),
     });
@@ -458,9 +436,7 @@ export async function listRecords(
 
     for (const eq of query.equalities) {
       params.push(eq.value);
-      where.push(
-        `${quoteIdent(eq.column)} = $${params.length}::${castFor(eq.column, collection)}`,
-      );
+      where.push(`${quoteIdent(eq.column)} = $${params.length}::${castFor(eq.column, collection)}`);
     }
     for (const range of query.ranges) {
       params.push(range.value);
@@ -472,12 +448,12 @@ export async function listRecords(
     if (query.cursor) {
       const cur = decodeCursor(query.cursor);
       if (cur.c !== query.sortColumn || cur.d !== query.sortDirection) {
-        throw new ValidationError("cursor does not match the current sort", {
+        throw new ValidationError('cursor does not match the current sort', {
           cursor: true,
         });
       }
       params.push(cur.v, cur.id);
-      const comparator = query.sortDirection === "desc" ? "<" : ">";
+      const comparator = query.sortDirection === 'desc' ? '<' : '>';
       where.push(
         `(${quoteIdent(query.sortColumn)}, "id") ${comparator}` +
           ` ($${params.length - 1}::${castFor(query.sortColumn, collection)}, $${params.length}::uuid)`,
@@ -488,7 +464,7 @@ export async function listRecords(
     params.push(query.limit + 1);
     const sql =
       `SELECT * FROM ${qualify(collection.schemaName, maskedName(collection.tableName))}` +
-      (where.length ? ` WHERE ${where.join(" AND ")}` : "") +
+      (where.length ? ` WHERE ${where.join(' AND ')}` : '') +
       ` ORDER BY ${quoteIdent(query.sortColumn)} ${dir}, "id" ${dir}` +
       ` LIMIT $${params.length}`;
 
@@ -500,7 +476,7 @@ export async function listRecords(
         projectId: ctx.projectId,
         principalId: ctx.principalId,
         purposeId: pid,
-        action: "list",
+        action: 'list',
         resource: `${collection.schemaName}.${collection.tableName}`,
         fields: collection.fields.map((f) => f.name),
       });
@@ -544,18 +520,15 @@ export async function updateRecord(
   input: UpdateInput,
 ): Promise<Record<string, unknown>> {
   if (Object.keys(input.fields).length === 0) {
-    throw new ValidationError("No fields to update");
+    throw new ValidationError('No fields to update');
   }
 
   const declared = new Set(collection.fields.map((f) => f.name));
   for (const name of Object.keys(input.fields)) {
     if (!declared.has(name)) {
-      throw new ValidationError(
-        `Unknown field '${name}' on collection '${collection.name}'`,
-        {
-          field: name,
-        },
-      );
+      throw new ValidationError(`Unknown field '${name}' on collection '${collection.name}'`, {
+        field: name,
+      });
     }
   }
 
@@ -568,11 +541,11 @@ export async function updateRecord(
     );
     const values = [recordId, ...Object.values(input.fields)];
 
-    await client.query("SAVEPOINT record_write");
+    await client.query('SAVEPOINT record_write');
     let rowPrincipalId: string;
     try {
       const res = await client.query<{ principal_id: string }>(
-        `UPDATE ${table} SET ${assignments.join(", ")}, "updated_at" = now()
+        `UPDATE ${table} SET ${assignments.join(', ')}, "updated_at" = now()
          WHERE id = $1::uuid
          RETURNING principal_id`,
         values,
@@ -585,15 +558,15 @@ export async function updateRecord(
           tableName: collection.tableName,
           recordId,
           purposeId: pid,
-          action: "update",
+          action: 'update',
           fields: Object.keys(input.fields),
         });
-        throw new NotFoundError("Record", recordId);
+        throw new NotFoundError('Record', recordId);
       }
       rowPrincipalId = res.rows[0].principal_id;
-      await client.query("RELEASE SAVEPOINT record_write");
+      await client.query('RELEASE SAVEPOINT record_write');
     } catch (err) {
-      await client.query("ROLLBACK TO SAVEPOINT record_write");
+      await client.query('ROLLBACK TO SAVEPOINT record_write');
       if (sqlState(err) === CONSENT_VIOLATION) {
         // The statement aborted the surrounding work; the savepoint lets the
         // denial still reach the audit chain inside this same transaction.
@@ -603,7 +576,7 @@ export async function updateRecord(
           tableName: collection.tableName,
           recordId,
           purposeId: pid,
-          action: "update",
+          action: 'update',
           fields: Object.keys(input.fields),
         });
       }
@@ -614,7 +587,7 @@ export async function updateRecord(
       projectId: ctx.projectId,
       principalId: rowPrincipalId,
       purposeId: pid,
-      action: "update",
+      action: 'update',
       resource: `${collection.schemaName}.${collection.tableName}/${recordId}`,
       fields: Object.keys(input.fields),
     });
@@ -638,7 +611,7 @@ export async function deleteRecord(
     const pid = await purposeId(client, ctx.projectId, ctx.purpose);
     const table = qualify(collection.schemaName, collection.tableName);
 
-    await client.query("SAVEPOINT record_write");
+    await client.query('SAVEPOINT record_write');
     let rowPrincipalId: string;
     try {
       const res = await client.query<{ principal_id: string }>(
@@ -652,15 +625,15 @@ export async function deleteRecord(
           tableName: collection.tableName,
           recordId,
           purposeId: pid,
-          action: "delete",
+          action: 'delete',
           fields: [],
         });
-        throw new NotFoundError("Record", recordId);
+        throw new NotFoundError('Record', recordId);
       }
       rowPrincipalId = res.rows[0].principal_id;
-      await client.query("RELEASE SAVEPOINT record_write");
+      await client.query('RELEASE SAVEPOINT record_write');
     } catch (err) {
-      await client.query("ROLLBACK TO SAVEPOINT record_write");
+      await client.query('ROLLBACK TO SAVEPOINT record_write');
       if (sqlState(err) === CONSENT_VIOLATION) {
         await recordDenial(pool, ctx, {
           projectId: ctx.projectId,
@@ -668,7 +641,7 @@ export async function deleteRecord(
           tableName: collection.tableName,
           recordId,
           purposeId: pid,
-          action: "delete",
+          action: 'delete',
           fields: [],
         });
       }
@@ -679,7 +652,7 @@ export async function deleteRecord(
       projectId: ctx.projectId,
       principalId: rowPrincipalId,
       purposeId: pid,
-      action: "delete",
+      action: 'delete',
       resource: `${collection.schemaName}.${collection.tableName}/${recordId}`,
       fields: [],
     });

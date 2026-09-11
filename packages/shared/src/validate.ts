@@ -1,5 +1,5 @@
-import type { ZodType, ZodTypeDef } from "zod";
-import { ValidationError } from "./errors.js";
+import type { ZodType, ZodTypeDef } from 'zod';
+import { ValidationError } from './errors.js';
 
 /**
  * Parse untrusted input at a system boundary.
@@ -15,7 +15,7 @@ import { ValidationError } from "./errors.js";
 export function parseInput<T>(
   schema: ZodType<T, ZodTypeDef, unknown>,
   data: unknown,
-  what = "request",
+  what = 'request',
 ): T {
   const result = schema.safeParse(data);
   if (!result.success) {
