@@ -300,6 +300,32 @@ describe('credentials', () => {
   });
 });
 
+describe('proxying a request with no body', () => {
+  /**
+   * The gateway used to declare content-type: application/json on every
+   * non-GET, body or not. Fastify rejects that combination outright, so any
+   * route legitimately taking no body — /v1/consents/:id/revoke among them —
+   * failed upstream with an error the caller could do nothing about.
+   *
+   * Asserted against a control-plane route so the test needs no second service:
+   * what matters is that the request survives the hop and is answered on its
+   * own terms, not that it succeeds.
+   */
+  it('does not announce a JSON body it is not sending', async () => {
+    const res = await gateway.inject({
+      method: 'POST',
+      url: '/v1/collections',
+      headers: auth(),
+    });
+
+    // A 400 about the missing collection name is the upstream having parsed the
+    // request. FST_ERR_CTP_EMPTY_JSON_BODY would mean it never got that far.
+    expect(res.statusCode).toBeLessThan(500);
+    expect(res.body).not.toContain('FST_ERR_CTP_EMPTY_JSON_BODY');
+    expect(res.body).not.toContain('Body cannot be empty');
+  });
+});
+
 describe('rate limiting', () => {
   it('refuses once the bucket is empty, per credential', async () => {
     const limited = await buildGateway({

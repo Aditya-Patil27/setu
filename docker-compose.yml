@@ -58,6 +58,19 @@ services:
       nats:
         condition: service_healthy
     env_file: .env
+    # Without these the gateway falls back to 127.0.0.1, which inside
+    # its own container is the gateway — so it could reach no service at
+    # all. On the compose network each service answers to its own name.
+    environment:
+      AUTH_SERVICE_URL: http://auth:3001
+      DATA_SERVICE_URL: http://data:3002
+      STORAGE_SERVICE_URL: http://storage:3003
+      FUNCTIONS_SERVICE_URL: http://functions:3004
+      CONSENT_SERVICE_URL: http://consent:3005
+      AUDIT_SERVICE_URL: http://audit:3006
+      WORKFLOW_SERVICE_URL: http://workflow:3007
+      METERING_SERVICE_URL: http://metering:3008
+      AI_SERVICE_URL: http://ai:3009
 
   # ── Platform services ────────────────────────────────────
   #

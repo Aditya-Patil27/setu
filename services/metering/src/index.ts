@@ -1,9 +1,9 @@
-﻿/**
+/**
  * M7 — Metering Service: Usage counters per tenant, SLA metrics
  */
 import { buildApp } from './app.js';
 
-const PORT = parseInt(process.env._SERVICE_PORT ?? '3008', 10);
+const PORT = parseInt(process.env.METERING_SERVICE_PORT ?? '3008', 10);
 
 async function main() {
   const app = await buildApp();

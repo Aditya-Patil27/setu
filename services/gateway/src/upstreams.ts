@@ -3,31 +3,40 @@ export type ServiceName =
 
 export type Upstreams = Record<ServiceName, string>;
 
-/** Upstream base URLs. Compose supplies the service names; localhost is the dev fallback. */
+/**
+ * Upstream base URLs.
+ *
+ * Compose supplies the service names through *_SERVICE_URL; the fallback is for
+ * running the services directly on a developer machine.
+ *
+ * 127.0.0.1 rather than localhost, deliberately. On a dual-stack host localhost
+ * resolves to ::1 first, and the services bind 0.0.0.0 — IPv4 only — so every
+ * proxied request fails with ECONNREFUSED before it leaves the gateway.
+ */
 export function upstreamsFromEnv(): Upstreams {
   return {
     auth:
-      process.env.AUTH_SERVICE_URL ?? `http://localhost:${process.env.AUTH_SERVICE_PORT ?? 3001}`,
+      process.env.AUTH_SERVICE_URL ?? `http://127.0.0.1:${process.env.AUTH_SERVICE_PORT ?? 3001}`,
     data:
-      process.env.DATA_SERVICE_URL ?? `http://localhost:${process.env.DATA_SERVICE_PORT ?? 3002}`,
+      process.env.DATA_SERVICE_URL ?? `http://127.0.0.1:${process.env.DATA_SERVICE_PORT ?? 3002}`,
     consent:
       process.env.CONSENT_SERVICE_URL ??
-      `http://localhost:${process.env.CONSENT_SERVICE_PORT ?? 3005}`,
+      `http://127.0.0.1:${process.env.CONSENT_SERVICE_PORT ?? 3005}`,
     audit:
-      process.env.AUDIT_SERVICE_URL ?? `http://localhost:${process.env.AUDIT_SERVICE_PORT ?? 3006}`,
+      process.env.AUDIT_SERVICE_URL ?? `http://127.0.0.1:${process.env.AUDIT_SERVICE_PORT ?? 3006}`,
     storage:
       process.env.STORAGE_SERVICE_URL ??
-      `http://localhost:${process.env.STORAGE_SERVICE_PORT ?? 3003}`,
+      `http://127.0.0.1:${process.env.STORAGE_SERVICE_PORT ?? 3003}`,
     metering:
       process.env.METERING_SERVICE_URL ??
-      `http://localhost:${process.env.METERING_SERVICE_PORT ?? 3008}`,
+      `http://127.0.0.1:${process.env.METERING_SERVICE_PORT ?? 3008}`,
     functions:
       process.env.FUNCTIONS_SERVICE_URL ??
-      `http://localhost:${process.env.FUNCTIONS_SERVICE_PORT ?? 3004}`,
+      `http://127.0.0.1:${process.env.FUNCTIONS_SERVICE_PORT ?? 3004}`,
     workflow:
       process.env.WORKFLOW_SERVICE_URL ??
-      `http://localhost:${process.env.WORKFLOW_SERVICE_PORT ?? 3007}`,
-    ai: process.env.AI_SERVICE_URL ?? `http://localhost:${process.env.AI_SERVICE_PORT ?? 3009}`,
+      `http://127.0.0.1:${process.env.WORKFLOW_SERVICE_PORT ?? 3007}`,
+    ai: process.env.AI_SERVICE_URL ?? `http://127.0.0.1:${process.env.AI_SERVICE_PORT ?? 3009}`,
   };
 }
 

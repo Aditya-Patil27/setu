@@ -1,9 +1,9 @@
-﻿/**
+/**
  * M6 — Functions Runtime: User JS packaged into containers, executed as K8s Jobs with resource limits
  */
 import { buildApp } from './app.js';
 
-const PORT = parseInt(process.env._SERVICE_PORT ?? '3004', 10);
+const PORT = parseInt(process.env.FUNCTIONS_SERVICE_PORT ?? '3004', 10);
 
 async function main() {
   const app = await buildApp();

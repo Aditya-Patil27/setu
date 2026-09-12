@@ -1,9 +1,9 @@
-﻿/**
+/**
  * M9 — Workflow Engine: Durable multi-step DAG execution with purpose propagation across steps
  */
 import { buildApp } from './app.js';
 
-const PORT = parseInt(process.env._SERVICE_PORT ?? '3007', 10);
+const PORT = parseInt(process.env.WORKFLOW_SERVICE_PORT ?? '3007', 10);
 
 async function main() {
   const app = await buildApp();

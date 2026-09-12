@@ -1,9 +1,9 @@
-﻿/**
+/**
  * M5 — Storage Service: Object upload/download via MinIO, signed URLs, purpose tags, encryption at rest
  */
 import { buildApp } from './app.js';
 
-const PORT = parseInt(process.env._SERVICE_PORT ?? '3003', 10);
+const PORT = parseInt(process.env.STORAGE_SERVICE_PORT ?? '3003', 10);
 
 async function main() {
   const app = await buildApp();

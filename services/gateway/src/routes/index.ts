@@ -111,7 +111,17 @@ const routes: FastifyPluginAsync = async (app) => {
     };
 
     const upstream = new URL(url.pathname + url.search, app.upstreams[route.service]);
-    const hasBody = request.method !== 'GET' && request.method !== 'HEAD';
+    /**
+     * A bodyless POST must not be announced as JSON.
+     *
+     * Fastify rejects `content-type: application/json` with an empty body, so
+     * declaring it on every non-GET made routes that legitimately take no body
+     * — /v1/consents/:id/revoke among them — fail at the upstream with an error
+     * the client could not act on. The header and the body are now decided by
+     * the same condition, so they cannot disagree.
+     */
+    const hasBody =
+      request.method !== 'GET' && request.method !== 'HEAD' && request.body !== undefined;
 
     const response = await fetch(upstream, {
       method: request.method,
@@ -120,7 +130,7 @@ const routes: FastifyPluginAsync = async (app) => {
         ...contextToHeaders(ctx, app.signingSecret),
         ...(hasBody ? { 'content-type': 'application/json' } : {}),
       },
-      body: hasBody && request.body !== undefined ? JSON.stringify(request.body) : undefined,
+      body: hasBody ? JSON.stringify(request.body) : undefined,
     });
 
     const text = await response.text();
