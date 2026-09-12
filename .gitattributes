@@ -1,0 +1,19 @@
+# Line endings are LF in the repository and LF in the working tree.
+#
+# Without this, a Windows checkout with core.autocrlf=true materialises every
+# file with CRLF while Prettier's endOfLine default is "lf" — so `npm run
+# format:check` fails on the whole tree immediately after a branch switch, on
+# files nobody edited. Pinning eol=lf makes the checkout match what the
+# formatter and CI expect, on every platform.
+* text=auto eol=lf
+
+# Binary, or otherwise not ours to normalise.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.woff binary
+*.woff2 binary
+package-lock.json -diff
