@@ -1,4 +1,4 @@
-﻿/**
+/**
  * M1 — API Gateway: TLS termination, auth, rate limiting, tenant resolution, purpose propagation, routing
  */
 import { buildApp } from './app.js';

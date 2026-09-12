@@ -1,4 +1,4 @@
-﻿/**
+/**
  * M2 — Auth Service: Phone-OTP and email identity, JWT issuance, API keys, role management
  */
 import { buildApp } from './app.js';

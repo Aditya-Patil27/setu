@@ -1,4 +1,4 @@
-﻿/**
+/**
  * M4 — Data Service: Auto-generated REST over tenant schemas, RLS policy and masking-view generation
  */
 import { buildApp } from './app.js';

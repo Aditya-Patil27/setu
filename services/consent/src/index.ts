@@ -1,4 +1,4 @@
-﻿/**
+/**
  * M3 — Consent and Policy Engine: Consent artifact lifecycle, purpose evaluation, RLS generation, rights APIs
  */
 import { buildApp } from './app.js';
