@@ -1,10 +1,11 @@
 import type { AddressInfo } from 'node:net';
 import { hash as argonHash } from '@node-rs/argon2';
-import type { FastifyInstance } from 'fastify';
+import Fastify, { type FastifyInstance } from 'fastify';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { SETU, contextToHeaders } from '@setu/shared';
 import { buildApp as buildData } from '../../services/data/src/app.js';
 import { buildApp as buildGateway } from '../../services/gateway/src/app.js';
+import { KeyCache } from '../../services/gateway/src/keycache.js';
 import { TokenBuckets } from '../../services/gateway/src/ratelimit.js';
 import {
   closePools,
@@ -37,6 +38,7 @@ const KEY_SECRET = 'z9WQe4vT1sNb7Lx2Kd6Rp0Ym';
 const API_KEY = `setu_${KEY_PREFIX}_${KEY_SECRET}`;
 
 let data: FastifyInstance;
+let dataUrl: string;
 let gateway: FastifyInstance;
 let project: TestProject;
 let otherProject: TestProject;
@@ -73,6 +75,7 @@ beforeAll(async () => {
   });
   await data.listen({ port: 0, host: '127.0.0.1' });
   const { port } = data.server.address() as AddressInfo;
+  dataUrl = `http://127.0.0.1:${port}`;
 
   gateway = await buildGateway({
     pools: { runtime: testPool('runtime') },
@@ -323,6 +326,164 @@ describe('proxying a request with no body', () => {
     expect(res.statusCode).toBeLessThan(500);
     expect(res.body).not.toContain('FST_ERR_CTP_EMPTY_JSON_BODY');
     expect(res.body).not.toContain('Body cannot be empty');
+  });
+});
+
+describe('the key cache', () => {
+  /**
+   * argon2id costs tens of milliseconds by design, and the gateway used to pay
+   * it on every request. The cache is what makes a second request cheap; these
+   * check that it does so without loosening what a credential means.
+   */
+  it('answers a repeat request without re-running argon2', async () => {
+    const fresh = await buildGateway({
+      pools: { runtime: testPool('runtime') },
+      upstreams: { data: dataUrl },
+      signingSecret: TEST_SECRET,
+      jwtSecret: JWT_SECRET,
+      buckets: new TokenBuckets({ capacity: 500, refillPerSecond: 500 }),
+    });
+
+    try {
+      const timed = async () => {
+        const started = process.hrtime.bigint();
+        const res = await fresh.inject({ method: 'GET', url: '/v1/collections', headers: auth() });
+        expect(res.statusCode).toBe(200);
+        return Number(process.hrtime.bigint() - started) / 1e6;
+      };
+
+      const cold = await timed();
+      const warm = await timed();
+
+      // A generous margin: the point is that the second request is not paying a
+      // fixed ~50ms hashing cost, not that it hits any particular latency.
+      expect(warm).toBeLessThan(cold);
+      expect(fresh.keyCache.size).toBe(1);
+    } finally {
+      await fresh.close();
+    }
+  });
+
+  it('still refuses a wrong secret sharing a cached prefix', async () => {
+    // The cache is keyed by the whole token, so a verified key must not vouch
+    // for a different secret that happens to carry the same prefix.
+    await gateway.inject({ method: 'GET', url: '/v1/collections', headers: auth() });
+
+    const res = await gateway.inject({
+      method: 'GET',
+      url: '/v1/collections',
+      headers: { authorization: `Bearer setu_${KEY_PREFIX}_totallyWrongSecret000` },
+    });
+
+    expect(res.statusCode).toBe(401);
+  });
+
+  it('stops honouring a key once it is revoked and the entry ages out', async () => {
+    const prefix = 'revokeme';
+    const secret = 'Zx9QwErTyUiOpAsDfGhJ';
+    const token = `setu_${prefix}_${secret}`;
+
+    await testPool('owner').query(
+      `INSERT INTO api_keys (project_id, key_hash, key_prefix, name)
+       VALUES ($1, $2, $3, 'revocable')`,
+      [project.projectId, await argonHash(secret), prefix],
+    );
+
+    // A 10ms window, so the test observes revocation rather than waiting on the
+    // 30s production default.
+    const fresh = await buildGateway({
+      pools: { runtime: testPool('runtime') },
+      upstreams: { data: dataUrl },
+      signingSecret: TEST_SECRET,
+      jwtSecret: JWT_SECRET,
+      buckets: new TokenBuckets({ capacity: 500, refillPerSecond: 500 }),
+      keyCache: new KeyCache({ ttlMs: 10 }),
+    });
+
+    try {
+      const call = () =>
+        fresh.inject({
+          method: 'GET',
+          url: '/v1/collections',
+          headers: { authorization: `Bearer ${token}` },
+        });
+
+      expect((await call()).statusCode).toBe(200);
+
+      await testPool('owner').query(`DELETE FROM api_keys WHERE key_prefix = $1`, [prefix]);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+
+      expect((await call()).statusCode).toBe(401);
+    } finally {
+      await fresh.close();
+    }
+  });
+});
+
+describe('a slow upstream', () => {
+  /**
+   * An unbounded proxy is how one wedged service becomes an outage everywhere:
+   * the request holds a socket and an event-loop slot for as long as the client
+   * waits. 504 also has to be distinguishable from 502 — "did not answer" and
+   * "refused" are different facts and a caller acts on them differently.
+   */
+  it('gives up with a 504 rather than waiting forever', async () => {
+    const slow = Fastify({ logger: false });
+    slow.get('/v1/collections', async () => {
+      await new Promise((resolve) => setTimeout(resolve, 2_000));
+      return { collections: [] };
+    });
+    await slow.listen({ port: 0, host: '127.0.0.1' });
+    const { port } = slow.server.address() as AddressInfo;
+
+    const impatient = await buildGateway({
+      pools: { runtime: testPool('runtime') },
+      upstreams: { data: `http://127.0.0.1:${port}` },
+      signingSecret: TEST_SECRET,
+      jwtSecret: JWT_SECRET,
+      buckets: new TokenBuckets({ capacity: 500, refillPerSecond: 500 }),
+      upstreamTimeoutMs: 80,
+    });
+
+    try {
+      const res = await impatient.inject({
+        method: 'GET',
+        url: '/v1/collections',
+        headers: auth(),
+      });
+
+      expect(res.statusCode).toBe(504);
+      expect(res.json().error.code).toBe('UPSTREAM_TIMEOUT');
+      // The upstream's address is internal topology; it must not leak outward.
+      expect(res.body).not.toContain('127.0.0.1');
+    } finally {
+      await impatient.close();
+      await slow.close();
+    }
+  });
+
+  it('reports a refused upstream as unavailable, not as a timeout', async () => {
+    const nowhere = await buildGateway({
+      pools: { runtime: testPool('runtime') },
+      // Port 1 is reserved and nothing listens on it.
+      upstreams: { data: 'http://127.0.0.1:1' },
+      signingSecret: TEST_SECRET,
+      jwtSecret: JWT_SECRET,
+      buckets: new TokenBuckets({ capacity: 500, refillPerSecond: 500 }),
+    });
+
+    try {
+      const res = await nowhere.inject({
+        method: 'GET',
+        url: '/v1/collections',
+        headers: auth(),
+      });
+
+      expect(res.statusCode).toBe(502);
+      expect(res.json().error.code).toBe('UPSTREAM_UNAVAILABLE');
+    } finally {
+      await nowhere.close();
+    }
   });
 });
 

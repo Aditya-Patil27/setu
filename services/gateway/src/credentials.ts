@@ -2,6 +2,7 @@ import { hash as argonHash, verify as argonVerify } from '@node-rs/argon2';
 import { jwtVerify } from 'jose';
 import type pg from 'pg';
 import { UnauthorizedError } from '@setu/shared';
+import type { KeyCache } from './keycache.js';
 
 /**
  * Who the caller is, resolved from a credential and never from a header.
@@ -56,10 +57,26 @@ interface KeyRow {
   key_id: string;
 }
 
-async function resolveApiKey(pool: pg.Pool, token: string): Promise<Identity> {
+async function resolveApiKey(pool: pg.Pool, token: string, cache?: KeyCache): Promise<Identity> {
   const parsed = API_KEY.exec(token);
   if (!parsed) reject();
   const [, prefix, secret] = parsed;
+
+  /**
+   * A cached verdict skips argon2 but not expiry.
+   *
+   * Re-checking expires_at here rather than trusting the cache window means a
+   * key that lapses mid-TTL stops working at its own expiry, which is the only
+   * behaviour a caller could reasonably predict.
+   */
+  const cached = cache?.get(token);
+  if (cached) {
+    if (cached.expiresAt && cached.expiresAt.getTime() <= Date.now()) {
+      cache?.delete(token);
+      reject();
+    }
+    return cached.identity;
+  }
 
   const res = await pool.query<KeyRow>(
     `SELECT k.id AS key_id, k.key_hash, k.expires_at, k.project_id, p.tenant_id
@@ -80,11 +97,17 @@ async function resolveApiKey(pool: pg.Pool, token: string): Promise<Identity> {
   if (!ok) reject();
   if (row.expires_at && row.expires_at.getTime() <= Date.now()) reject();
 
-  return {
+  const identity: Identity = {
     tenantId: row.tenant_id,
     projectId: row.project_id,
     rateKey: `key:${row.key_id}`,
   };
+
+  // Only a verified key is cached. A rejection is never remembered, so a key
+  // created just after someone probed for it works on its first real use.
+  cache?.set(token, { identity, expiresAt: row.expires_at });
+
+  return identity;
 }
 
 interface ProjectRow {
@@ -128,11 +151,12 @@ export async function resolveCredential(
   pool: pg.Pool,
   authorization: string | undefined,
   jwtSecret: string,
+  cache?: KeyCache,
 ): Promise<Identity> {
   const token = authorization?.startsWith('Bearer ') ? authorization.slice(7).trim() : undefined;
   if (!token) reject();
 
   return token.startsWith('setu_')
-    ? resolveApiKey(pool, token)
+    ? resolveApiKey(pool, token, cache)
     : resolveJwt(pool, token, jwtSecret);
 }

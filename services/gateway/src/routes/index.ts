@@ -4,6 +4,7 @@ import {
   NotFoundError,
   RateLimitError,
   SETU,
+  SetuError,
   ValidationError,
   contextToHeaders,
   type SignedContext,
@@ -86,6 +87,7 @@ const routes: FastifyPluginAsync = async (app) => {
       app.pools.runtime,
       request.headers.authorization,
       app.jwtSecret,
+      app.keyCache,
     );
 
     if (!app.buckets.take(identity.rateKey)) throw new RateLimitError();
@@ -123,15 +125,42 @@ const routes: FastifyPluginAsync = async (app) => {
     const hasBody =
       request.method !== 'GET' && request.method !== 'HEAD' && request.body !== undefined;
 
-    const response = await fetch(upstream, {
-      method: request.method,
-      headers: {
-        ...forwardableHeaders(request),
-        ...contextToHeaders(ctx, app.signingSecret),
-        ...(hasBody ? { 'content-type': 'application/json' } : {}),
-      },
-      body: hasBody ? JSON.stringify(request.body) : undefined,
-    });
+    /**
+     * Bounded, because an unbounded proxy is how one slow service becomes an
+     * outage everywhere.
+     *
+     * Without a deadline a hung upstream holds this request, its socket and its
+     * slot in the event loop for as long as the client is willing to wait, and
+     * the gateway stops answering for everyone. 504 says plainly that the
+     * upstream did not answer in time, which is a different fact from the
+     * upstream having refused — and the caller can act on the difference.
+     */
+    let response: Response;
+    try {
+      response = await fetch(upstream, {
+        method: request.method,
+        headers: {
+          ...forwardableHeaders(request),
+          ...contextToHeaders(ctx, app.signingSecret),
+          ...(hasBody ? { 'content-type': 'application/json' } : {}),
+        },
+        body: hasBody ? JSON.stringify(request.body) : undefined,
+        signal: AbortSignal.timeout(app.upstreamTimeoutMs),
+      });
+    } catch (err) {
+      const timedOut = err instanceof Error && err.name === 'TimeoutError';
+      request.log.error({ err, service: route.service, timedOut }, 'upstream request failed');
+
+      // Never surface the upstream's address or the underlying cause: it names
+      // internal topology the caller has no business learning.
+      throw new SetuError(
+        timedOut
+          ? `The ${route.service} service did not respond in time`
+          : `The ${route.service} service is unavailable`,
+        timedOut ? 504 : 502,
+        timedOut ? 'UPSTREAM_TIMEOUT' : 'UPSTREAM_UNAVAILABLE',
+      );
+    }
 
     const text = await response.text();
     reply.status(response.status);
