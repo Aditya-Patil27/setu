@@ -1,0 +1,552 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Setu — Consent Console</title>
+    <style>
+      :root {
+        --bg: #fbfaf8;
+        --panel: #ffffff;
+        --ink: #1a1a18;
+        --muted: #6b6b64;
+        --line: #e3e0d9;
+        --readable: #15803d;
+        --masked: #b45309;
+        --hidden: #9ca3af;
+        --accent: #1d4ed8;
+        --danger: #b91c1c;
+        --mono: ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --bg: #14140f;
+          --panel: #1c1c18;
+          --ink: #ecebe6;
+          --muted: #9b9a92;
+          --line: #34342d;
+          --readable: #4ade80;
+          --masked: #fbbf24;
+          --hidden: #6b7280;
+          --accent: #93b4ff;
+          --danger: #f87171;
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        padding: 24px 16px 64px;
+        background: var(--bg);
+        color: var(--ink);
+        font:
+          15px/1.55 ui-sans-serif,
+          system-ui,
+          -apple-system,
+          'Segoe UI',
+          sans-serif;
+      }
+
+      main {
+        max-width: 1100px;
+        margin: 0 auto;
+      }
+
+      header {
+        margin-bottom: 28px;
+      }
+
+      h1 {
+        font-size: 22px;
+        margin: 0 0 6px;
+        letter-spacing: -0.01em;
+      }
+
+      .thesis {
+        color: var(--muted);
+        margin: 0;
+        max-width: 68ch;
+      }
+
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        align-items: center;
+        margin: 20px 0 4px;
+      }
+
+      button {
+        font: inherit;
+        padding: 7px 14px;
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        background: var(--panel);
+        color: var(--ink);
+        cursor: pointer;
+      }
+
+      button:hover:not(:disabled) {
+        border-color: var(--accent);
+        color: var(--accent);
+      }
+
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+
+      button.danger:hover:not(:disabled) {
+        border-color: var(--danger);
+        color: var(--danger);
+      }
+
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px;
+        color: var(--muted);
+        font-size: 13px;
+        margin: 14px 0 24px;
+      }
+
+      .swatch::before {
+        content: '●';
+        margin-right: 6px;
+      }
+
+      .swatch.readable::before {
+        color: var(--readable);
+      }
+      .swatch.masked::before {
+        color: var(--masked);
+      }
+      .swatch.hidden::before {
+        color: var(--hidden);
+      }
+
+      .customer {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        margin-bottom: 20px;
+        overflow: hidden;
+      }
+
+      .customer > h2 {
+        font-size: 15px;
+        margin: 0;
+        padding: 12px 16px;
+        border-bottom: 1px solid var(--line);
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        flex-wrap: wrap;
+      }
+
+      .pid {
+        font-family: var(--mono);
+        font-size: 11px;
+        font-weight: 400;
+        color: var(--muted);
+      }
+
+      .scroll {
+        overflow-x: auto;
+      }
+
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        min-width: 640px;
+      }
+
+      th,
+      td {
+        text-align: left;
+        padding: 9px 16px;
+        border-bottom: 1px solid var(--line);
+        vertical-align: top;
+      }
+
+      tbody tr:last-child td,
+      tbody tr:last-child th {
+        border-bottom: none;
+      }
+
+      thead th {
+        font-size: 12px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        font-weight: 600;
+      }
+
+      tbody th {
+        font-family: var(--mono);
+        font-size: 13px;
+        font-weight: 400;
+        color: var(--muted);
+        white-space: nowrap;
+      }
+
+      td {
+        font-family: var(--mono);
+        font-size: 13px;
+      }
+
+      td.readable {
+        color: var(--readable);
+      }
+      td.masked {
+        color: var(--masked);
+      }
+      td.hidden {
+        color: var(--hidden);
+        font-style: italic;
+      }
+
+      .revoke-row td {
+        padding-top: 12px;
+        padding-bottom: 12px;
+      }
+
+      .note {
+        color: var(--muted);
+        font-size: 13px;
+        margin: 0;
+        padding: 10px 16px;
+        border-top: 1px solid var(--line);
+      }
+
+      .error {
+        background: var(--panel);
+        border: 1px solid var(--danger);
+        border-left-width: 3px;
+        border-radius: 8px;
+        padding: 14px 16px;
+        margin-bottom: 20px;
+      }
+
+      .error h2 {
+        margin: 0 0 6px;
+        font-size: 14px;
+        color: var(--danger);
+      }
+
+      .error pre {
+        margin: 0;
+        white-space: pre-wrap;
+        font-family: var(--mono);
+        font-size: 12px;
+        color: var(--muted);
+      }
+
+      .empty {
+        color: var(--muted);
+        padding: 24px 16px;
+      }
+    </style>
+  </head>
+
+  <body>
+    <main>
+      <header>
+        <h1>Setu — Consent Console</h1>
+        <p class="thesis">
+          One row, read three times. The only difference between these columns is the
+          <code>x-setu-purpose</code> header; the query, the credential and the table are identical.
+          Postgres decides what each purpose sees, before any result reaches this page.
+        </p>
+
+        <div class="toolbar">
+          <button id="refresh">Refresh</button>
+          <button id="seed-hint" title="What to run if this page is empty">Nothing here?</button>
+        </div>
+
+        <div class="legend">
+          <span class="swatch readable">readable under this purpose</span>
+          <span class="swatch masked">masked by policy</span>
+          <span class="swatch hidden">row not visible at all</span>
+        </div>
+      </header>
+
+      <div id="errors"></div>
+      <div id="content"></div>
+    </main>
+
+    <script type="module">
+      const PURPOSES = ['delivery_partner', 'support_chat', 'analytics'];
+      const COLLECTION = 'orders';
+      const FIELDS = ['customer_name', 'phone', 'address', 'city', 'item', 'amount'];
+
+      const content = document.getElementById('content');
+      const errors = document.getElementById('errors');
+
+      async function api(path, { purpose, method = 'GET' } = {}) {
+        const headers = {};
+        if (purpose) headers['x-setu-purpose'] = purpose;
+
+        const res = await fetch(`/api${path}`, { method, headers });
+        const text = await res.text();
+        const body = text ? JSON.parse(text) : null;
+
+        if (!res.ok) {
+          const err = new Error(body?.error?.message ?? `HTTP ${res.status}`);
+          err.code = body?.error?.code;
+          throw err;
+        }
+        return body;
+      }
+
+      function showError(title, detail) {
+        const box = document.createElement('div');
+        box.className = 'error';
+        box.innerHTML = '<h2></h2><pre></pre>';
+        box.querySelector('h2').textContent = title;
+        box.querySelector('pre').textContent = detail;
+        errors.appendChild(box);
+      }
+
+      /**
+       * A masked value is still a value: the platform substitutes rather than
+       * omits, so the response shape stays stable. That is why this classifies
+       * by content instead of by absence.
+       */
+      function classify(value) {
+        if (value === null || value === undefined) return 'masked';
+        const text = String(value);
+        if (text === '***') return 'masked';
+        if (/^\*{4}/.test(text)) return 'masked';
+        return 'readable';
+      }
+
+      function render(customers) {
+        content.replaceChildren();
+
+        if (customers.length === 0) {
+          const empty = document.createElement('p');
+          empty.className = 'empty';
+          empty.textContent =
+            'No records visible. Seed the demo and create an order, then refresh.';
+          content.appendChild(empty);
+          return;
+        }
+
+        for (const customer of customers) {
+          const card = document.createElement('section');
+          card.className = 'customer';
+
+          const heading = document.createElement('h2');
+          const name = document.createElement('span');
+          name.textContent = customer.label;
+          const pid = document.createElement('span');
+          pid.className = 'pid';
+          pid.textContent = customer.principalId;
+          heading.append(name, pid);
+          card.appendChild(heading);
+
+          const scroll = document.createElement('div');
+          scroll.className = 'scroll';
+
+          const table = document.createElement('table');
+          const thead = document.createElement('thead');
+          const headRow = document.createElement('tr');
+          headRow.appendChild(document.createElement('th'));
+          for (const purpose of PURPOSES) {
+            const th = document.createElement('th');
+            th.textContent = purpose;
+            headRow.appendChild(th);
+          }
+          thead.appendChild(headRow);
+          table.appendChild(thead);
+
+          const tbody = document.createElement('tbody');
+
+          for (const field of FIELDS) {
+            const tr = document.createElement('tr');
+            const label = document.createElement('th');
+            label.scope = 'row';
+            label.textContent = field;
+            tr.appendChild(label);
+
+            for (const purpose of PURPOSES) {
+              const td = document.createElement('td');
+              const row = customer.byPurpose[purpose];
+
+              if (!row) {
+                td.className = 'hidden';
+                td.textContent = '—';
+              } else {
+                const value = row[field];
+                td.className = classify(value);
+                td.textContent = value === null || value === undefined ? 'null' : String(value);
+              }
+              tr.appendChild(td);
+            }
+            tbody.appendChild(tr);
+          }
+
+          // Revoke, per purpose, so the effect is visible in one column only.
+          const revokeRow = document.createElement('tr');
+          revokeRow.className = 'revoke-row';
+          const revokeLabel = document.createElement('th');
+          revokeLabel.scope = 'row';
+          revokeLabel.textContent = 'consent';
+          revokeRow.appendChild(revokeLabel);
+
+          for (const purpose of PURPOSES) {
+            const td = document.createElement('td');
+            const consent = customer.consents[purpose];
+
+            if (!consent) {
+              td.className = 'hidden';
+              td.textContent = 'never granted';
+            } else if (consent.status !== 'active') {
+              // Distinguished from 'never granted' deliberately: after clicking
+              // revoke, the column beside this one empties, and the reason for
+              // that needs to be visible rather than inferred.
+              td.className = 'masked';
+              td.textContent = consent.status;
+            } else {
+              const button = document.createElement('button');
+              button.className = 'danger';
+              button.textContent = 'Revoke';
+              button.addEventListener('click', async () => {
+                button.disabled = true;
+                button.textContent = 'Revoking…';
+                try {
+                  await api(`/consents/${consent.id}/revoke`, { method: 'POST' });
+                  await load();
+                } catch (err) {
+                  showError(`Could not revoke ${purpose}`, err.message);
+                  button.disabled = false;
+                  button.textContent = 'Revoke';
+                }
+              });
+              td.appendChild(button);
+            }
+            revokeRow.appendChild(td);
+          }
+          tbody.appendChild(revokeRow);
+
+          table.appendChild(tbody);
+          scroll.appendChild(table);
+          card.appendChild(scroll);
+
+          const missing = PURPOSES.filter((p) => !customer.byPurpose[p]);
+          if (missing.length) {
+            const note = document.createElement('p');
+            note.className = 'note';
+            note.textContent =
+              `Not visible to ${missing.join(', ')} — row-level security, not field masking. ` +
+              'The row is absent from the result, not blanked out in it.';
+            card.appendChild(note);
+          }
+
+          content.appendChild(card);
+        }
+      }
+
+      async function load() {
+        errors.replaceChildren();
+
+        // One read per purpose. Same path, same credential, different intent.
+        const reads = await Promise.all(
+          PURPOSES.map(async (purpose) => {
+            try {
+              const body = await api(`/collections/${COLLECTION}/records?limit=50`, { purpose });
+              return { purpose, records: body.records ?? [] };
+            } catch (err) {
+              showError(`Reading as ${purpose} failed`, `${err.code ?? 'ERROR'}: ${err.message}`);
+              return { purpose, records: [] };
+            }
+          }),
+        );
+
+        let consents = [];
+        try {
+          consents = (await api('/consents')).consents ?? [];
+        } catch (err) {
+          showError('Reading consent artifacts failed', err.message);
+        }
+
+        // Index by principal, then by purpose, so each customer becomes one table.
+        const byPrincipal = new Map();
+
+        for (const { purpose, records } of reads) {
+          for (const record of records) {
+            const id = record.principalId;
+            if (!byPrincipal.has(id)) {
+              byPrincipal.set(id, { principalId: id, byPurpose: {}, consents: {}, label: null });
+            }
+            const entry = byPrincipal.get(id);
+            entry.byPurpose[purpose] = record;
+
+            // Whichever purpose may read the name supplies the label; if none
+            // can, the id stands in rather than a redaction.
+            if (!entry.label && classify(record.customer_name) === 'readable') {
+              entry.label = String(record.customer_name);
+            }
+          }
+        }
+
+        /**
+         * Consent artifacts, not just records, decide who appears here.
+         *
+         * A principal who revoked every purpose vanishes from all three reads,
+         * and dropping them from the page would make a full revocation look
+         * like a bug. They stay, with every column empty — which is the honest
+         * picture, including that this console can no longer read their name.
+         */
+        for (const consent of consents) {
+          if (!byPrincipal.has(consent.principalId)) {
+            byPrincipal.set(consent.principalId, {
+              principalId: consent.principalId,
+              byPurpose: {},
+              consents: {},
+              label: null,
+            });
+          }
+          const entry = byPrincipal.get(consent.principalId);
+          const existing = entry.consents[consent.purpose];
+          // A new grant supersedes an older artifact for the same pair, so the
+          // active one wins whatever order the list arrived in.
+          if (!existing || existing.status !== 'active') {
+            entry.consents[consent.purpose] = consent;
+          }
+        }
+
+        const customers = [...byPrincipal.values()];
+        for (const customer of customers) {
+          if (!customer.label) customer.label = `(name withheld from every purpose)`;
+        }
+        customers.sort((a, b) => a.label.localeCompare(b.label));
+
+        render(customers);
+      }
+
+      document.getElementById('refresh').addEventListener('click', load);
+      document.getElementById('seed-hint').addEventListener('click', () => {
+        showError(
+          'Getting data in',
+          [
+            '1. docker compose up          (or just the postgres service)',
+            '2. node scripts/migrate.mjs',
+            '3. node scripts/seed.mjs      — prints the API key and a walkthrough',
+            '4. start the gateway, data and consent services',
+            '5. follow step 1 and 2 of the seed output to declare `orders`',
+            '   and create an order for each customer, then refresh here.',
+          ].join('\n'),
+        );
+      });
+
+      load();
+    </script>
+  </body>
+</html>

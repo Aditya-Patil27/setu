@@ -22,7 +22,26 @@ export default tseslint.config(
     languageOptions: {
       ecmaVersion: 2023,
       sourceType: 'module',
-      globals: { process: 'readonly', console: 'readonly', URL: 'readonly' },
+      // The Node globals the scripts in this repo actually use. Listed rather
+      // than pulled from the `globals` package to keep the dev dependencies
+      // small; a new undefined global is a lint error, which is the point.
+      globals: {
+        process: 'readonly',
+        console: 'readonly',
+        Buffer: 'readonly',
+        URL: 'readonly',
+        URLSearchParams: 'readonly',
+        fetch: 'readonly',
+        setTimeout: 'readonly',
+        clearTimeout: 'readonly',
+        setInterval: 'readonly',
+        clearInterval: 'readonly',
+        TextEncoder: 'readonly',
+        TextDecoder: 'readonly',
+        AbortController: 'readonly',
+        __dirname: 'readonly',
+        __filename: 'readonly',
+      },
     },
   },
 

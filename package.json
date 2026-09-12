@@ -18,6 +18,7 @@
     "test:watch": "vitest",
     "db:migrate": "node scripts/migrate.mjs",
     "db:seed": "node scripts/seed.mjs",
+    "console": "node scripts/console.mjs",
     "clean": "rimraf **/dist **/node_modules/.cache"
   },
   "devDependencies": {
