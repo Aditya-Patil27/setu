@@ -68,18 +68,59 @@ export async function provisionProject(hint = 'proj'): Promise<TestProject> {
 }
 
 /** Drop everything the project owns. Safe to call twice. */
-export async function dropProject(project: TestProject): Promise<void> {
+/**
+ * Tear a project down.
+ *
+ * Serialised across worker processes, and retried on deadlock, because teardown
+ * reaches further than it looks. Every generated collection table carries an FK
+ * to public.principals, so deleting one project's tenant cascades to its
+ * principals and Postgres must lock every table referencing them — including
+ * collection tables belonging to other suites running in other forks. Two
+ * teardowns overlapping, or one overlapping another suite's CREATE TABLE, can
+ * therefore take the same locks in opposite orders.
+ *
+ * The advisory lock is transaction-scoped and taken first, so only one teardown
+ * runs at a time. The retry covers the remaining case: a teardown racing a
+ * collection being declared in another fork, which this cannot serialise because
+ * that DDL is issued by the service rather than by these helpers.
+ */
+const TEARDOWN_LOCK = 918_273_645;
+const DEADLOCK = '40P01';
+
+export async function dropProject(project: TestProject, attempt = 0): Promise<void> {
   const owner = testPool('owner');
-  await owner.query(`DROP SCHEMA IF EXISTS ${quoteIdent(project.schemaName)} CASCADE`);
-  // Audit and usage rows deliberately do not cascade: a chain that vanished
-  // along with its project would not be an audit chain, and usage that vanished
-  // would take the billing record with it. Test data still has to go, and the
-  // Data service writes audit rows on every read, permitted or denied.
-  await owner.query(`DELETE FROM audit_edges WHERE project_id = $1`, [project.projectId]);
-  await owner.query(`DELETE FROM audit_records WHERE project_id = $1`, [project.projectId]);
-  await owner.query(`DELETE FROM usage_records WHERE tenant_id = $1`, [project.tenantId]);
-  // Projects, principals, purposes and consent artifacts all cascade from tenants.
-  await owner.query(`DELETE FROM tenants WHERE id = $1`, [project.tenantId]);
+  const client = await owner.connect();
+
+  try {
+    await client.query('BEGIN');
+    await client.query('SELECT pg_advisory_xact_lock($1)', [TEARDOWN_LOCK]);
+
+    await client.query(`DROP SCHEMA IF EXISTS ${quoteIdent(project.schemaName)} CASCADE`);
+    // Audit and usage rows deliberately do not cascade: a chain that vanished
+    // along with its project would not be an audit chain, and usage that vanished
+    // would take the billing record with it. Test data still has to go, and the
+    // Data service writes audit rows on every read, permitted or denied.
+    await client.query(`DELETE FROM audit_edges WHERE project_id = $1`, [project.projectId]);
+    await client.query(`DELETE FROM audit_records WHERE project_id = $1`, [project.projectId]);
+    await client.query(`DELETE FROM usage_records WHERE tenant_id = $1`, [project.tenantId]);
+    // Projects, principals, purposes and consent artifacts all cascade from tenants.
+    await client.query(`DELETE FROM tenants WHERE id = $1`, [project.tenantId]);
+
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => undefined);
+
+    const code = (err as { code?: string }).code;
+    if (code === DEADLOCK && attempt < 4) {
+      client.release();
+      // Stagger, so two losers do not immediately collide again.
+      await new Promise((resolve) => setTimeout(resolve, 50 * (attempt + 1)));
+      return dropProject(project, attempt + 1);
+    }
+    throw err;
+  } finally {
+    client.release();
+  }
 }
 
 export async function createPurpose(

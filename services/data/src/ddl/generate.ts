@@ -148,6 +148,58 @@ function maskExpression(field: FieldSpec, type: ColumnType, alias = 't'): string
  * it the view runs as its owner, who can see every row, and the view becomes a
  * hole straight through the policy.
  */
+/**
+ * The two gates, split by what actually varies.
+ *
+ * The view used to call public.setu_field_visible once per projected cell, and
+ * that function is a five-table EXISTS — 1,600 evaluations for a 100-row page
+ * over 16 fields. But only one of its four inputs varies down a page: the row's
+ * principal. Collection, purpose and field name are fixed for the whole query.
+ *
+ * So the check splits in two. Which fields the tenant grants to this purpose
+ * depends on nothing in the row, so it is computed once for the query. Which
+ * fields the principal consented to is one indexed lookup per row. A cell then
+ * costs two array membership tests instead of a join.
+ *
+ * An earlier attempt collapsed both halves into a single per-row lateral and was
+ * measurably worse — 8 fields over 100 rows went from 34ms to 209ms — because
+ * EXISTS stops at the first match while building an array cannot. Splitting the
+ * constant half out is what makes the difference; keeping the per-row half
+ * narrow is what keeps it cheap.
+ */
+function gateJoins(collectionId: string): string {
+  const cid = `${quoteLiteral(collectionId)}::uuid`;
+
+  return `CROSS JOIN LATERAL (
+    SELECT ARRAY(
+      SELECT fd.name
+        FROM public.field_definitions fd
+        JOIN public.collection_definitions cd ON cd.id = fd.collection_id
+        JOIN public.field_purpose_grants fpg  ON fpg.field_id = fd.id
+        JOIN public.purposes p                ON p.id = fpg.purpose_id
+       WHERE fd.collection_id = ${cid}
+         AND p.name       = current_setting('app.purpose', true)
+         AND p.project_id = cd.project_id
+    ) AS granted
+  ) tenant
+  LEFT JOIN LATERAL (
+    SELECT ARRAY(
+      SELECT f
+        FROM public.consent_artifacts ca
+        JOIN public.purposes p ON p.id = ca.purpose_id
+        CROSS JOIN LATERAL unnest(ca.fields) AS f
+       WHERE ca.principal_id = t."principal_id"
+         AND p.name       = current_setting('app.purpose', true)
+         AND p.project_id = (
+           SELECT cd.project_id FROM public.collection_definitions cd WHERE cd.id = ${cid}
+         )
+         AND ca.status = 'active'
+         AND ca.revoked_at IS NULL
+         AND (ca.expires_at IS NULL OR ca.expires_at > now())
+    ) AS consented
+  ) subject ON true`;
+}
+
 export function maskingViewSql(
   schema: string,
   table: string,
@@ -156,7 +208,15 @@ export function maskingViewSql(
 ): string {
   const projected = fields.map((f) => {
     const type = validateField(f);
-    const visible = `public.setu_field_visible(t."principal_id", ${quoteLiteral(collectionId)}::uuid, ${quoteLiteral(f.name)}, current_setting('app.purpose', true))`;
+    /**
+     * Both gates, same as before: the tenant must grant the field to this
+     * purpose and the principal's own active consent must list it. A principal
+     * with no consent at all yields NULL from the LEFT JOIN, and `= ANY(NULL)`
+     * is NULL rather than true, so the field masks — which is what the function
+     * returning false did.
+     */
+    const name = quoteLiteral(f.name);
+    const visible = `${name} = ANY(tenant.granted) AND ${name} = ANY(subject.consented)`;
     return `  CASE WHEN ${visible} THEN t.${quoteIdent(f.name)} ELSE ${maskExpression(f, type)} END AS ${quoteIdent(f.name)}`;
   });
 
@@ -165,7 +225,8 @@ export function maskingViewSql(
   return `CREATE VIEW ${qualify(schema, maskedViewName(table))} WITH (security_invoker = true) AS
 SELECT
 ${[...system, ...projected].join(',\n')}
-FROM ${qualify(schema, table)} t`;
+FROM ${qualify(schema, table)} t
+${gateJoins(collectionId)}`;
 }
 
 export function dropViewSql(schema: string, table: string): string {

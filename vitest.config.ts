@@ -25,7 +25,17 @@ export default defineConfig({
     hookTimeout: 60_000,
     globalSetup: ['tests/global-setup.ts'],
     // Services log at info by default; a passing suite should be quiet.
-    env: { LOG_LEVEL: 'silent' },
+    env: {
+      LOG_LEVEL: 'silent',
+      /**
+       * Suites run in parallel forks and each fork opens its own pools, so the
+       * per-pool ceiling is multiplied by the number of workers. At the
+       * production default of 8 that approaches the server's max_connections
+       * before any suite does real work, and the failure lands on whichever
+       * file happened to connect last rather than on the one at fault.
+       */
+      POSTGRES_POOL_MAX: '4',
+    },
     // Forks keep each file's pg pools genuinely isolated.
     pool: 'forks',
   },

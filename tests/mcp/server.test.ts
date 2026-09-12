@@ -97,6 +97,11 @@ beforeAll(async () => {
   await grantConsent(principalId, supportId, ['full_name', 'city']);
   await grantConsent(principalId, analyticsId, ['city']);
 
+  // key_prefix carries a unique index and these suites use fixed prefixes, so a
+  // run that aborted before its afterAll would otherwise poison every run after
+  // it. Clearing first makes the fixture idempotent rather than order-dependent.
+  await testPool('owner').query(`DELETE FROM api_keys WHERE key_prefix = $1`, [KEY_PREFIX]);
+
   await testPool('owner').query(
     `INSERT INTO api_keys (project_id, key_hash, key_prefix, name)
      VALUES ($1, $2, $3, 'mcp test key')`,

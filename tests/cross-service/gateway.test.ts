@@ -61,6 +61,11 @@ beforeAll(async () => {
   await grantConsent(principalId, supportId, ['full_name', 'city']);
   await grantConsent(principalId, analyticsId, ['full_name', 'city']);
 
+  // key_prefix carries a unique index and these suites use fixed prefixes, so a
+  // run that aborted before its afterAll would otherwise poison every run after
+  // it. Clearing first makes the fixture idempotent rather than order-dependent.
+  await testPool('owner').query(`DELETE FROM api_keys WHERE key_prefix = $1`, [KEY_PREFIX]);
+
   await testPool('owner').query(
     `INSERT INTO api_keys (project_id, key_hash, key_prefix, name)
      VALUES ($1, $2, $3, 'test key')`,
@@ -383,6 +388,8 @@ describe('the key cache', () => {
     const secret = 'Zx9QwErTyUiOpAsDfGhJ';
     const token = `setu_${prefix}_${secret}`;
 
+    // Same reason as the fixture above: a fixed prefix under a unique index.
+    await testPool('owner').query(`DELETE FROM api_keys WHERE key_prefix = $1`, [prefix]);
     await testPool('owner').query(
       `INSERT INTO api_keys (project_id, key_hash, key_prefix, name)
        VALUES ($1, $2, $3, 'revocable')`,
