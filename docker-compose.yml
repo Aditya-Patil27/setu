@@ -2,6 +2,11 @@ services:
   # ── Infrastructure ───────────────────────────────────────
   postgres:
     image: pgvector/pgvector:pg16
+    # The default max_connections is 100, and ten services opening ~14
+    # pools between them ask for more than that before serving a single
+    # request. 200 leaves headroom for psql, the migration runner and the
+    # test suite alongside a running stack.
+    command: postgres -c max_connections=200
     ports:
       - "${POSTGRES_PORT:-5432}:5432"
     environment:

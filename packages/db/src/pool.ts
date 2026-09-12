@@ -22,6 +22,32 @@ export interface PoolConfig {
 export type DbRole = 'runtime' | 'control' | 'owner';
 
 /**
+ * How many server connections one pool may hold.
+ *
+ * This was 20, which does not survive contact with the whole platform: ten
+ * services open roughly fourteen pools between them, and 14 x 20 is 280 server
+ * connections against a PostgreSQL default max_connections of 100. Starting the
+ * stack exhausted the server, and the failure surfaced somewhere unrelated —
+ * a test suite failing to connect while the service that took the connections
+ * looked healthy.
+ *
+ * Eight is chosen to fit: fourteen pools at eight is 112, comfortably inside the
+ * 200 that docker-compose now configures, with room for psql and the migration
+ * runner. A single service handling real traffic wants more than eight, and the
+ * answer to that is PgBouncer in front rather than a larger number here —
+ * multiplexing many short transactions onto few server connections is what a
+ * pooler is for, and every query in this codebase is transaction-scoped.
+ */
+const DEFAULT_POOL_MAX = 8;
+
+function poolMax(explicit?: number): number {
+  if (explicit !== undefined) return explicit;
+
+  const configured = Number(process.env.POSTGRES_POOL_MAX);
+  return Number.isFinite(configured) && configured > 0 ? configured : DEFAULT_POOL_MAX;
+}
+
+/**
  * Create a connection pool.
  * Uses transaction-mode pooling — all context-setting MUST use set_config(..., true).
  */
@@ -32,7 +58,16 @@ export function createPool(config: PoolConfig): pg.Pool {
     user: config.user,
     password: config.password,
     database: config.database,
-    max: config.max ?? 20,
+    max: poolMax(config.max),
+    /**
+     * Return an idle connection to the server rather than holding it forever.
+     *
+     * Without this a service that saw one burst of traffic keeps its whole pool
+     * open for the life of the process, so the connection budget is consumed by
+     * peak usage that may never recur.
+     */
+    idleTimeoutMillis: Number(process.env.POSTGRES_POOL_IDLE_MS ?? 30_000),
+    connectionTimeoutMillis: Number(process.env.POSTGRES_CONNECT_TIMEOUT_MS ?? 10_000),
   });
 }
 
