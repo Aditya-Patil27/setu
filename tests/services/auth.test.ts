@@ -254,6 +254,144 @@ describe('otp sign-in', () => {
   });
 });
 
+describe('one person, one principal', () => {
+  /**
+   * Migration 008 and the upsert that leans on it.
+   *
+   * Consent hangs off principal_id, so a person split across two principals has
+   * a grant recorded against one that is invisible to the other — and a
+   * revocation against one leaves their data reachable through the other. These
+   * assert the identity cannot split, which is what makes the consent guarantee
+   * hold for a returning user.
+   */
+
+  async function principalsFor(destination: string, column: 'phone' | 'email') {
+    const res = await testPool('owner').query<{ id: string }>(
+      `SELECT id FROM principals WHERE project_id = $1 AND ${column} = $2`,
+      [project.projectId, destination],
+    );
+    return res.rows.map((r) => r.id);
+  }
+
+  it('reuses the same principal when a phone signs in twice', async () => {
+    const phone = '+919812300777';
+
+    const first = await signIn(phone);
+    const second = await signIn(phone);
+
+    expect(second.principalId).toBe(first.principalId);
+    expect(await principalsFor(phone, 'phone')).toHaveLength(1);
+  });
+
+  it('does not split the identity under concurrent verification', async () => {
+    const phone = '+919812300888';
+
+    // Two challenges outstanding at once, then both verified together — the
+    // shape that used to produce two principals for one person.
+    const [a, b] = await Promise.all([
+      app.inject({
+        method: 'POST',
+        url: '/v1/auth/otp/start',
+        headers: headers(),
+        payload: { phone },
+      }),
+      app.inject({
+        method: 'POST',
+        url: '/v1/auth/otp/start',
+        headers: headers(),
+        payload: { phone },
+      }),
+    ]);
+
+    const verify = (challengeId: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/v1/auth/otp/verify',
+        headers: headers(),
+        payload: { challengeId, code: MOCK_CODE },
+      });
+
+    const results = await Promise.all([verify(a.json().challengeId), verify(b.json().challengeId)]);
+
+    const ok = results.filter((r) => r.statusCode === 200);
+    expect(ok.length).toBeGreaterThan(0);
+
+    // Whatever the interleaving, there is exactly one principal for that phone,
+    // and every verification that succeeded names it.
+    const ids = await principalsFor(phone, 'phone');
+    expect(ids).toHaveLength(1);
+    for (const r of ok) expect(r.json().principalId).toBe(ids[0]);
+  });
+
+  it('treats an email as the same person regardless of case', async () => {
+    const start = (email: string) =>
+      app.inject({
+        method: 'POST',
+        url: '/v1/auth/otp/start',
+        headers: headers(),
+        payload: { email },
+      });
+
+    const first = await start('Asha.Menon@Example.COM');
+    const firstVerified = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/otp/verify',
+      headers: headers(),
+      payload: { challengeId: first.json().challengeId, code: MOCK_CODE },
+    });
+    expect(firstVerified.statusCode).toBe(200);
+
+    const second = await start('asha.menon@example.com');
+    const secondVerified = await app.inject({
+      method: 'POST',
+      url: '/v1/auth/otp/verify',
+      headers: headers(),
+      payload: { challengeId: second.json().challengeId, code: MOCK_CODE },
+    });
+    expect(secondVerified.statusCode).toBe(200);
+
+    expect(secondVerified.json().principalId).toBe(firstVerified.json().principalId);
+    expect(await principalsFor('asha.menon@example.com', 'email')).toHaveLength(1);
+    // The mixed-case spelling was never stored, so it matches nothing.
+    expect(await principalsFor('Asha.Menon@Example.COM', 'email')).toHaveLength(0);
+  });
+
+  it('refuses a duplicate principal at the database, not only in the service', async () => {
+    const phone = '+919812300999';
+    await testPool('owner').query(`INSERT INTO principals (project_id, phone) VALUES ($1, $2)`, [
+      project.projectId,
+      phone,
+    ]);
+
+    // The constraint is the guarantee; a second insert cannot succeed even from
+    // a caller that skipped the service entirely.
+    await expect(
+      testPool('owner').query(`INSERT INTO principals (project_id, phone) VALUES ($1, $2)`, [
+        project.projectId,
+        phone,
+      ]),
+    ).rejects.toThrow(/duplicate key|unique/i);
+  });
+
+  it('still allows many principals with no phone and no email', async () => {
+    // The indexes are partial: a NULL destination is not an identity, so rows
+    // without one must not contend with each other.
+    for (let i = 0; i < 3; i += 1) {
+      await testPool('owner').query(
+        `INSERT INTO principals (project_id, display_name) VALUES ($1, $2)`,
+        [project.projectId, `anonymous ${i}`],
+      );
+    }
+
+    const res = await testPool('owner').query<{ n: string }>(
+      `SELECT count(*) AS n FROM principals
+        WHERE project_id = $1 AND phone IS NULL AND email IS NULL`,
+      [project.projectId],
+    );
+    expect(Number(res.rows[0].n)).toBeGreaterThanOrEqual(3);
+  });
+});
+
 describe('refresh rotation', () => {
   const refresh = (refreshToken: string) =>
     app.inject({

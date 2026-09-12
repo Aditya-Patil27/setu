@@ -47,6 +47,24 @@ interface ChallengeRow {
 
 const routes: FastifyPluginAsync = async (app) => {
   /**
+   * Normalise a destination before it is stored or looked up.
+   *
+   * The unique index from migration 008 compares strings, so 'Asha@example.com'
+   * and 'asha@example.com' would occupy two rows and split one person into two
+   * principals — the exact failure the index exists to prevent, arriving by a
+   * different route. Mail is case-insensitive in the part that matters here, so
+   * the address is lowercased once, on the way in.
+   *
+   * Phone numbers are only trimmed. Digits have no case, and anything cleverer —
+   * stripping spaces, inferring a country code — would silently merge or split
+   * identities based on a guess about formatting.
+   */
+  function normalizeDestination(value: string, channel: 'phone' | 'email'): string {
+    const trimmed = value.trim();
+    return channel === 'email' ? trimmed.toLowerCase() : trimmed;
+  }
+
+  /**
    * Begin a challenge. The response never reveals whether the destination is
    * already a principal — that would turn this into a membership oracle for
    * anyone holding a publishable key.
@@ -56,7 +74,7 @@ const routes: FastifyPluginAsync = async (app) => {
     const body = parseInput(StartOtp, request.body, 'otp request');
 
     const channel = body.phone ? 'phone' : 'email';
-    const destination = (body.phone ?? body.email)!;
+    const destination = normalizeDestination((body.phone ?? body.email)!, channel);
     const code = await app.otp.issue(destination, channel);
 
     const res = await app.pools.control.query<{ id: string }>(
@@ -116,20 +134,32 @@ const routes: FastifyPluginAsync = async (app) => {
         challenge.id,
       ]);
 
+      /**
+       * Resolve the principal in one statement.
+       *
+       * This was a SELECT followed by a conditional INSERT, which is a race: two
+       * verifications for the same destination arriving together both found no
+       * row and both inserted, splitting one person into two principals. Consent
+       * hangs off principal_id, so a grant recorded as one was invisible to the
+       * other and a revocation against one left data reachable through the other.
+       *
+       * The upsert leans on the partial unique index from migration 008 — the
+       * WHERE clause is what lets Postgres infer it — so concurrent inserts
+       * contend at the index and exactly one wins. DO UPDATE rather than DO
+       * NOTHING because NOTHING returns no row on conflict, which would leave
+       * the loser of the race with nothing to attribute a session to.
+       *
+       * `column` comes from a two-value union, never from input.
+       */
       const column = challenge.channel === 'phone' ? 'phone' : 'email';
-      const existing = await client.query<{ id: string }>(
-        `SELECT id FROM principals WHERE project_id = $1 AND ${column} = $2`,
+      const upserted = await client.query<{ id: string }>(
+        `INSERT INTO principals (project_id, ${column}) VALUES ($1, $2)
+         ON CONFLICT (project_id, ${column}) WHERE ${column} IS NOT NULL
+         DO UPDATE SET updated_at = now()
+         RETURNING id`,
         [ctx.projectId, challenge.destination],
       );
-
-      const principalId = existing.rowCount
-        ? existing.rows[0].id
-        : (
-            await client.query<{ id: string }>(
-              `INSERT INTO principals (project_id, ${column}) VALUES ($1, $2) RETURNING id`,
-              [ctx.projectId, challenge.destination],
-            )
-          ).rows[0].id;
+      const principalId = upserted.rows[0].id;
 
       const session = await issueSession(client, app.tokens, principalId, ctx.projectId);
       await client.query('COMMIT');
