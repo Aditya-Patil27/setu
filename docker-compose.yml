@@ -1,3 +1,9 @@
+# Every service reads .env, which points the host-side tools (migrate, seed,
+# the test suite) at localhost. Inside a container localhost is the container
+# itself, so on the compose network each dependency is reached by its name.
+x-in-network: &in-network
+  POSTGRES_HOST: postgres
+
 services:
   # ── Infrastructure ───────────────────────────────────────
   postgres:
@@ -21,23 +27,6 @@ services:
       timeout: 3s
       retries: 5
 
-  minio:
-    image: minio/minio:latest
-    command: server /data --console-address ":9001"
-    ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-setu_minio}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-setu_minio_password}
-    volumes:
-      - miniodata:/data
-    healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
-      interval: 5s
-      timeout: 3s
-      retries: 5
-
   nats:
     image: nats:2-alpine
     ports:
@@ -45,7 +34,9 @@ services:
       - "8222:8222"  # monitoring
     command: ["--jetstream", "--http_port", "8222"]
     healthcheck:
-      test: ["CMD", "nats-server", "--signal", "ldm"]
+      # Not `nats-server --signal ldm`: ldm is lame-duck mode, which tells the
+      # server to shut down, so that check stopped NATS five seconds after boot.
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8222/healthz"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -67,6 +58,7 @@ services:
     # its own container is the gateway — so it could reach no service at
     # all. On the compose network each service answers to its own name.
     environment:
+      <<: *in-network
       AUTH_SERVICE_URL: http://auth:3001
       DATA_SERVICE_URL: http://data:3002
       STORAGE_SERVICE_URL: http://storage:3003
@@ -92,6 +84,8 @@ services:
       postgres:
         condition: service_healthy
     env_file: .env
+    environment:
+      <<: *in-network
 
   data:
     build:
@@ -103,15 +97,19 @@ services:
       nats:
         condition: service_healthy
     env_file: .env
+    environment:
+      <<: *in-network
 
   storage:
     build:
       context: .
       dockerfile: deploy/docker/storage.Dockerfile
     depends_on:
-      minio:
+      postgres:
         condition: service_healthy
     env_file: .env
+    environment:
+      <<: *in-network
 
   functions:
     build:
@@ -126,6 +124,8 @@ services:
     # root on the host. Nothing spawns containers today; when real isolation
     # arrives it will be gVisor or Firecracker, not the host socket.
     env_file: .env
+    environment:
+      <<: *in-network
 
   consent:
     build:
@@ -137,6 +137,8 @@ services:
       nats:
         condition: service_healthy
     env_file: .env
+    environment:
+      <<: *in-network
 
   audit:
     build:
@@ -148,6 +150,8 @@ services:
       nats:
         condition: service_healthy
     env_file: .env
+    environment:
+      <<: *in-network
 
   workflow:
     build:
@@ -159,6 +163,9 @@ services:
       nats:
         condition: service_healthy
     env_file: .env
+    environment:
+      <<: *in-network
+      FUNCTIONS_SERVICE_URL: http://functions:3004
 
   ai:
     build:
@@ -168,6 +175,8 @@ services:
       postgres:
         condition: service_healthy
     env_file: .env
+    environment:
+      <<: *in-network
 
   metering:
     build:
@@ -179,18 +188,8 @@ services:
       nats:
         condition: service_healthy
     env_file: .env
-
-  # ── Dashboard ────────────────────────────────────────────
-  dashboard:
-    build:
-      context: .
-      dockerfile: deploy/docker/dashboard.Dockerfile
-    ports:
-      - "${DASHBOARD_PORT:-3100}:3000"
-    depends_on:
-      - gateway
-    env_file: .env
+    environment:
+      <<: *in-network
 
 volumes:
   pgdata:
-  miniodata:

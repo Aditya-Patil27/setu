@@ -8,7 +8,7 @@ Setu is a multi-tenant BaaS platform in which privacy compliance is a property o
 
 ```
               ┌───────────────────────────────────────┐
-              │  Dashboard (Next.js) · CLI · JS SDK   │
+              │     Console · JS SDK · MCP server     │
               └────────────────────┬──────────────────┘
                                    │ HTTPS
               ┌────────────────────▼──────────────────┐
@@ -29,8 +29,8 @@ Setu is a multi-tenant BaaS platform in which privacy compliance is a property o
                                  │
         ┌────────────┬───────────┼───────────┬──────────────┐
    ┌────▼─────┐ ┌────▼─────┐ ┌───▼────┐ ┌────▼─────────┐
-   │ Postgres │ │  MinIO   │ │  NATS  │ │  Metering +  │
-   │  (+RLS)  │ │(objects) │ │(events)│ │ Audit Store  │
+   │ Postgres │ │  Object  │ │  NATS  │ │  Metering +  │
+   │  (+RLS)  │ │  store   │ │(events)│ │ Audit Store  │
    └──────────┘ └──────────┘ └────────┘ └──────────────┘
 ```
 
@@ -107,7 +107,7 @@ chain.
 | Agent interface  | MCP over stdio                 | wired |
 | Containers       | Docker + Compose               | wired |
 | CI               | GitHub Actions                 | wired |
-| Object storage   | MinIO (S3-compatible)          | seam — filesystem store today, behind an interface |
+| Object storage   | Local filesystem               | seam — an S3-compatible store slots in behind an interface |
 | Messaging        | NATS                           | seam — no-op publisher today, behind an interface |
 | Orchestration    | Kubernetes (Helm)              | not started — chart has no templates |
 | Observability    | Prometheus + Grafana           | not started |
@@ -115,8 +115,9 @@ chain.
 
 The seams are deliberate and documented at the call site: swapping the
 filesystem object store for S3, or the no-op event publisher for NATS, touches
-one file each. The compose stack still runs both containers, which is why they
-appear here at all.
+one file each. Compose still runs a NATS container. It no longer runs MinIO:
+nothing read from it, and the `minio/minio` image stopped being pullable from
+Docker Hub, which left `docker compose up` unable to start on a fresh machine.
 
 ## Modules
 

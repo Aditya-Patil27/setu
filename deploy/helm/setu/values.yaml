@@ -50,10 +50,6 @@ metering:
   port: 3008
   replicas: 1
 
-dashboard:
-  port: 3100
-  replicas: 1
-
 # ── Infrastructure ───────────────────────────────────────
 postgresql:
   enabled: true
