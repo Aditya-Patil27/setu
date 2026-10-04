@@ -10,10 +10,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@setu/shared": "*",
+    "@fastify/cors": "^10.0.0",
     "@setu/db": "*",
+    "@setu/shared": "*",
     "fastify": "^5.0.0",
-    "@fastify/cors": "^10.0.0"
+    "isolated-vm": "^6.2.0"
   },
   "devDependencies": {
     "tsx": "^4.0.0"

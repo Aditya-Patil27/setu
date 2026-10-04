@@ -118,11 +118,11 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-    # No docker.sock mount. The runtime executes tenant JavaScript in a child
-    # process with no syscall isolation (services/functions/src/runtime.ts), so
-    # handing it the host Docker daemon would turn any deployed function into
-    # root on the host. Nothing spawns containers today; when real isolation
-    # arrives it will be gVisor or Firecracker, not the host socket.
+    # No docker.sock mount. Tenant JavaScript runs in a V8 isolate inside a
+    # child process (services/functions/src/runtime.ts). That isolation is V8's,
+    # not the kernel's, so an isolate escape must land somewhere with nothing to
+    # take: handing this container the host Docker daemon would make it root on
+    # the host. Kernel-level isolation, when added, is gVisor or Firecracker.
     env_file: .env
     environment:
       <<: *in-network

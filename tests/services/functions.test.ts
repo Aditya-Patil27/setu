@@ -136,28 +136,65 @@ describe('what tenant code is handed', () => {
   /**
    * The load-bearing one for isolation. A function that could read
    * INTERNAL_SIGNING_SECRET could forge any context it liked, which would end
-   * the purpose system entirely. It is not in the child's environment, and
-   * neither is the database password.
+   * the purpose system entirely. Stripping the environment is not enough on its
+   * own: with the filesystem it could read /proc or the service's .env, and with
+   * a socket it could reach the services directly. So it gets neither, and no
+   * process object to look in.
    */
-  it('cannot see the platform secrets', async () => {
+  it('has no process, module loader or network to reach the platform with', async () => {
     await define({
       name: 'peek',
       purposes: [SUPPORT],
       source: `export default async () => ({
-        signing: process.env.INTERNAL_SIGNING_SECRET ?? null,
-        postgres: process.env.POSTGRES_PASSWORD ?? null,
-        jwt: process.env.JWT_SECRET ?? null,
-        keys: Object.keys(process.env).sort(),
+        process: typeof process,
+        require: typeof require,
+        fetch: typeof fetch,
+        WebSocket: typeof WebSocket,
+        Buffer: typeof Buffer,
       });`,
     });
 
     const res = await invoke('peek', SUPPORT);
-    const output = res.json().output;
 
-    expect(output.signing).toBeNull();
-    expect(output.postgres).toBeNull();
-    expect(output.jwt).toBeNull();
-    expect(output.keys).not.toContain('INTERNAL_SIGNING_SECRET');
+    expect(res.json().execution.status).toBe('succeeded');
+    expect(res.json().output).toEqual({
+      process: 'undefined',
+      require: 'undefined',
+      fetch: 'undefined',
+      WebSocket: 'undefined',
+      Buffer: 'undefined',
+    });
+  });
+
+  it('cannot import a Node built-in', async () => {
+    await define({
+      name: 'lister',
+      purposes: [SUPPORT],
+      source: `import { readdirSync } from 'node:fs';
+        export default async () => readdirSync('.');`,
+    });
+
+    const res = await invoke('lister', SUPPORT);
+
+    expect(res.json().execution.status).toBe('failed');
+    expect(res.json().execution.stderr).toContain('failed to load function');
+    expect(res.json().output).toBeNull();
+  });
+
+  it('cannot import one dynamically either', async () => {
+    await define({
+      name: 'dialer',
+      purposes: [SUPPORT],
+      source: `export default async () => {
+        const net = await import('node:net');
+        return typeof net.createConnection;
+      };`,
+    });
+
+    const res = await invoke('dialer', SUPPORT);
+
+    expect(res.json().execution.status).toBe('failed');
+    expect(res.json().output).toBeNull();
   });
 
   it('is given the request context as facts, with no credentials among them', async () => {
@@ -207,6 +244,24 @@ describe('a function that misbehaves', () => {
     expect(res.json().timedOut).toBe(true);
     expect(res.json().execution.status).toBe('failed');
     expect(res.json().execution.stderr).toContain('timeout');
+  }, 30_000);
+
+  it('is stopped when it exceeds its memory limit', async () => {
+    await define({
+      name: 'hoarder',
+      purposes: [SUPPORT],
+      memoryMb: 32,
+      source: `export default async () => {
+        const hoard = [];
+        for (;;) hoard.push(new Array(1e6).fill(hoard.length));
+      };`,
+    });
+
+    const res = await invoke('hoarder', SUPPORT);
+
+    expect(res.statusCode).toBe(200);
+    expect(res.json().execution.status).toBe('failed');
+    expect(res.json().output).toBeNull();
   }, 30_000);
 
   /** A throwing function is a failed execution, not a broken platform. */

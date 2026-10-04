@@ -1,5 +1,5 @@
 /**
- * M6 — Functions Runtime: User JS packaged into containers, executed as K8s Jobs with resource limits
+ * M6 — Functions Runtime: tenant JS run in a V8 isolate, one child process per invocation
  */
 import { buildApp } from './app.js';
 
